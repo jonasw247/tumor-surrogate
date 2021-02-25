@@ -7,15 +7,16 @@ from tumor_surrogate_pytorch.config import get_config
 from tumor_surrogate_pytorch.data import TumorDataset
 from tumor_surrogate_pytorch.model import TumorSurrogate
 from tumor_surrogate_pytorch.utils import AverageMeter, loss_function, compute_dice_score, mean_absolute_error
-
-
+import torchvision
+import matplotlib.pyplot as plt
+from pathlib import Path
 class Trainer():
 
     def __init__(self, config, device):
         self.config = config
         self.device = device
-        self.writer = SummaryWriter(log_dir='runs/')
-        self.save_path = config.save_path
+        self.writer = SummaryWriter(log_dir=config.log_path + config.run_name)
+        self.save_path = config.save_path + config.run_name
         self.global_step = 0
 
     """ learning rate """
@@ -62,7 +63,7 @@ class Trainer():
                 # train weight parameters if not fix_net_weights
                 input, parameters, ground_truth = input.to(self.device), parameters.to(self.device), ground_truth.to(self.device)
 
-                output = net(input, parameters)  # forward (DataParallel)
+                output, _ = net(input, parameters)  # forward (DataParallel)
                 # loss
                 loss = loss_function(u_sim=ground_truth, u_pred=output, csf=input[:, 2:3])
                 # measure accuracy and record loss
@@ -94,7 +95,7 @@ class Trainer():
 
             # validate
             if (epoch + 1) % validation_frequency == 0:
-                val_loss, val_mae, val_dice = self.validate(net=net, writer=self.writer)
+                val_loss, val_mae, val_dice = self.validate(net=net, writer=self.writer, step=self.global_step)
 
                 # tensorboard logging
                 self.writer.add_scalar("Loss/train-val", val_loss, self.global_step)
@@ -103,7 +104,7 @@ class Trainer():
                 self.writer.flush()
 
     def validate(self, net, writer=None, step=0):
-        valid_dataset = TumorDataset(data_dir=self.config.data_path, dataset='valid/')
+        valid_dataset = TumorDataset(data_path=self.config.data_path, dataset='tumor_mparam/v/')
         valid_data_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=self.config.val_batch_size, num_workers=16, pin_memory=True,
                                                         shuffle=True)
 
@@ -119,24 +120,26 @@ class Trainer():
         mae_wm = []
         mae_gm = []
         mae_csf = []
-
+        Path(f'tumor_surrogate_pytorch/attention_maps/{self.config.run_name}').mkdir(parents=True, exist_ok=True)
         with torch.no_grad():
             ground_truths = []
             outputs = []
+            attmaps = []
             for i, (input_batch, parameters, ground_truth_batch) in enumerate(valid_data_loader):
                 input_batch, parameters, ground_truth_batch = input_batch.to(self.device), parameters.to(self.device), ground_truth_batch.to(
                     self.device)
 
                 # compute output
-                output_batch = net(input_batch, parameters)
+                output_batch, attmap_batch = net(input_batch, parameters)
 
                 loss = loss_function(u_sim=ground_truth_batch, u_pred=output_batch, csf=input_batch[:, 2:3])
                 losses.update(loss, input_batch.size(0))
 
-                for output, ground_truth, input in zip(output_batch, ground_truth_batch, input_batch):
-                    output, ground_truth, input = output[None, :], ground_truth[None, :], input[None, :]  # get batch dim back
+                for output, attmap, ground_truth, input in zip(output_batch, attmap_batch, ground_truth_batch, input_batch):
+                    output, attmap, ground_truth, input = output[None, :], attmap[None, :], ground_truth[None, :], input[None, :]  # get batch dim back
                     if i == 0:
                         outputs.append(output)
+                        attmaps.append(attmap)
                         ground_truths.append(ground_truth)
                     # measure mae, dice score and record loss
                     mae_wm_value, mae_gm_value, mae_csf_value = mean_absolute_error(ground_truth=ground_truth, output=output, input=input)
@@ -162,6 +165,22 @@ class Trainer():
                     if dice_08 is not None:
                         dice_score_08.append(dice_08.cpu().item())
 
+                if writer is not None and i == 0:
+                    grid = torchvision.utils.make_grid(torch.cat(ground_truths)[0:6, 0:1, :, :, 32])
+                    writer.add_image('ground truths', grid, global_step=step)
+                    grid = torchvision.utils.make_grid(torch.cat(outputs)[0:6, 0:1, :, :, 32])
+                    writer.add_image('predictions', grid, global_step=step)
+                    grid = torchvision.utils.make_grid(torch.cat(attmaps)[0:6, 0:1, :, :, 32])
+                    writer.add_image('attmaps', grid, global_step=step)
+                    writer.flush()
+                    fig, axs = plt.subplots(1, 6, sharey=True, tight_layout=True)
+                    axs[0].imshow(attmaps[0][0,0,:,:,32].cpu().numpy(), cmap='jet')
+                    axs[1].imshow(attmaps[1][0,0,:,:,32].cpu().numpy(), cmap='jet')
+                    axs[2].imshow(attmaps[2][0,0,:,:,32].cpu().numpy(), cmap='jet')
+                    axs[3].imshow(attmaps[3][0,0,:,:,32].cpu().numpy(), cmap='jet')
+                    axs[4].imshow(attmaps[4][0,0,:,:,32].cpu().numpy(), cmap='jet')
+                    axs[5].imshow(attmaps[5][0,0,:,:,32].cpu().numpy(), cmap='jet')
+                    plt.savefig(f'tumor_surrogate_pytorch/attention_maps/{self.config.run_name}/maps_{step}.png')
             return losses.avg, mae.avg, dice_score_avg.avg
 
 

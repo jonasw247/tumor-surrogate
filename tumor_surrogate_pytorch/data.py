@@ -9,7 +9,7 @@ from torch.utils.data import Dataset, DataLoader
 class TumorDataset(Dataset):
     def __init__(self, data_path, dataset):
         data_dir = os.path.join(data_path, dataset)
-        self.data_list = sorted(glob.glob(data_dir + '*'))
+        self.data_list = sorted(glob.glob(data_dir + '*'))[100:116]
         self.args = {}
         self.y_range = []
         self.y_num = []
