@@ -185,7 +185,7 @@ class MultiAttentionBlock(nn.Module):
                                                  inter_channels=inter_size, mode=nonlocal_mode,
                                                  sub_sample_factor= sub_sample_factor)
         self.combine_gates = nn.Sequential(nn.Conv3d(in_size, in_size, kernel_size=1, stride=1, padding=0),
-                                           nn.BatchNorm3d(in_size),
+                                           #nn.BatchNorm3d(in_size),
                                            nn.ReLU(inplace=True)
                                            )
 

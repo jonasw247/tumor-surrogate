@@ -6,7 +6,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tumor_surrogate_pytorch.config import get_config
 from tumor_surrogate_pytorch.data import TumorDataset
 from tumor_surrogate_pytorch.model import TumorSurrogate
-from tumor_surrogate_pytorch.utils import AverageMeter, loss_function, compute_dice_score, mean_absolute_error
+from tumor_surrogate_pytorch.utils import AverageMeter, weighted_loss, loss_function, compute_dice_score, mean_absolute_error
 import torchvision
 import matplotlib.pyplot as plt
 from pathlib import Path
@@ -34,7 +34,7 @@ class Trainer():
             param_group['lr'] = new_lr
 
     def train(self):
-        train_dataset = TumorDataset(data_path=self.config.data_path, dataset='tumor_mparam/v/')
+        train_dataset = TumorDataset(data_path=self.config.data_path, dataset='tumor_mparam/v/', truncate=True)
         data_loader = torch.utils.data.DataLoader(train_dataset, batch_size=self.config.train_batch_size,
                                                   num_workers=16, pin_memory=True, shuffle=True)
 
@@ -104,7 +104,7 @@ class Trainer():
                 self.writer.flush()
 
     def validate(self, net, writer=None, step=0):
-        valid_dataset = TumorDataset(data_path=self.config.data_path, dataset='tumor_mparam/v/')
+        valid_dataset = TumorDataset(data_path=self.config.data_path, dataset='valid/')
         valid_data_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=self.config.val_batch_size, num_workers=16, pin_memory=True,
                                                         shuffle=True)
 

@@ -39,6 +39,24 @@ def loss_function(u_sim, u_pred, csf):
     loss = pred_loss + csf_loss
     return loss
 
+def weighted_loss(u_sim, u_pred, csf):
+    pred_loss_tumor = torch.mean(torch.abs(u_sim[u_sim >= 0.001] - u_pred[u_sim >= 0.001]))
+    pred_loss_healthy = torch.mean(torch.abs(u_sim[u_sim < 0.001] - u_pred[u_sim < 0.001]))
+
+    if math.isnan(pred_loss_tumor.item()):
+        pred_loss_tumor = torch.tensor(0)
+    if math.isnan(pred_loss_healthy.item()):
+        pred_loss_healthy = torch.tensor(0)
+
+    pred_loss = 0.75 * pred_loss_tumor + 0.25 * pred_loss_healthy
+    csf_loss = torch.mean(torch.abs(u_sim[csf >= 0.001] - u_pred[csf >= 0.001]))
+
+    if math.isnan(pred_loss.item()):
+        pred_loss = 0
+
+    loss = pred_loss + csf_loss
+    return loss
+
 
 def compute_dice_score(u_pred, u_sim, threshold):
     tp = torch.sum((u_pred > threshold) * (u_sim > threshold)).float()
@@ -83,7 +101,6 @@ def create_hists(model, val_loader, device, save_path):
             output_batch = model(input_batch, parameters)
             # measure mae, dice score and record loss
             loss = loss_function(u_sim=ground_truth_batch, u_pred=output_batch, csf=input_batch[:,2:3])
-            print(loss)
             losses.append(loss.item())
 
             for output, ground_truth, input in zip(output_batch, ground_truth_batch, input_batch):
