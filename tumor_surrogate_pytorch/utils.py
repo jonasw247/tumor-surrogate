@@ -98,7 +98,7 @@ def create_hists(model, val_loader, device, save_path):
             print(f'iteration {i} of {len(val_loader)}')
             input_batch, parameters, ground_truth_batch = input_batch.to(device), parameters.to(device), ground_truth_batch.to(device)
             # compute output
-            output_batch = model(input_batch, parameters)
+            output_batch, attmaps = model(input_batch, parameters)
             # measure mae, dice score and record loss
             loss = loss_function(u_sim=ground_truth_batch, u_pred=output_batch, csf=input_batch[:,2:3])
             losses.append(loss.item())
@@ -118,6 +118,10 @@ def create_hists(model, val_loader, device, save_path):
                 # axs[3].imshow(ground_truth[0,0, :, :, 32].cpu())
                 # axs[4].imshow(output[0,0,:,:,32].cpu())
                 # plt.show()
+
+                #visualize attention map
+                #plt.imshow(attmaps[0][00, :, :, 32].cpu().numpy(), cmap='jet')
+                #plt.show()
 
 
                 dice_02 = compute_dice_score(u_pred=output, u_sim=ground_truth, threshold=0.2)
