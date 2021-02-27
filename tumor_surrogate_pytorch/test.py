@@ -14,19 +14,19 @@ def load_weights(model, path):
     return model
 
 
-def test(data_path):
+def test(data_path, run_name):
     net = TumorSurrogate(widths=[128, 128, 128, 128], n_cells=[5, 5, 5, 4], strides=[2, 2, 2, 1])
-    os.environ['CUDA_VISIBLE_DEVICES'] = "6"
+    os.environ['CUDA_VISIBLE_DEVICES'] = "5"
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     net = net.to(device=device)
 
-    if os.path.exists('./tumor_surrogate_pytorch/saved_model/model'):
-        net = load_weights(net, path=config.save_path)
+    if os.path.exists(f'./tumor_surrogate_pytorch/saved_model/{run_name}'):
+        net = load_weights(net, path=f'./tumor_surrogate_pytorch/saved_model/{run_name}')
     else:
         raise Exception("No trained model exists. Please train a model before testing.")
     net.to(device=device)
 
-    save_path = './tumor_surrogate-pytorch/test_output/'
+    save_path = './tumor_surrogate_pytorch/test_output/'
     dataset = TumorDataset(data_path=data_path, dataset='valid/')
     loader = DataLoader(dataset, batch_size=32, shuffle=False, num_workers=32)
     create_hists(net, loader, device, save_path)
@@ -34,4 +34,4 @@ def test(data_path):
 
 if __name__ == '__main__':
     config, unparsed = get_config()
-    test(config.data_path)
+    test(config.data_path, config.run_name)
