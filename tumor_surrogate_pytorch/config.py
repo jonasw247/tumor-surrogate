@@ -22,6 +22,8 @@ train_arg.add_argument('--save_path', type=str, default='tumor_surrogate_pytorch
 train_arg.add_argument('--log_path', type=str, default='tumor_surrogate_pytorch/runs/')
 train_arg.add_argument('--run_name', type=str, default='model')
 train_arg.add_argument('--gpu_id', type=str, default='4')
+train_arg.add_argument('--resume', action='store_true')
+
 
 train_arg = add_argument_group('Data')
 train_arg.add_argument('--data_path', type=str, default='/mnt/Drive2/ivan/deept/data/')
