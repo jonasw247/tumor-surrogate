@@ -123,7 +123,6 @@ def create_hists(model, val_loader, device, save_path):
                 #plt.imshow(attmaps[0][00, :, :, 32].cpu().numpy(), cmap='jet')
                 #plt.show()
 
-
                 dice_02 = compute_dice_score(u_pred=output, u_sim=ground_truth, threshold=0.2)
                 dice_04 = compute_dice_score(u_pred=output, u_sim=ground_truth, threshold=0.4)
                 dice_08 = compute_dice_score(u_pred=output, u_sim=ground_truth, threshold=0.8)

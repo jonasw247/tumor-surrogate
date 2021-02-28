@@ -45,15 +45,24 @@ class Trainer():
         optimizer = torch.optim.Adam(
             net.parameters(), self.config.lr_min, weight_decay=self.config.weight_decay, betas=(self.config.beta1, self.config.beta2)
         )
+        start_epoch = 0
+        best_dice = 0.
+        if self.config.resume:
+            load_dict = torch.load(self.save_path)
+            net.load_state_dict(load_dict['state_dict'])
+            start_epoch = load_dict['epoch']
+            optimizer.load_state_dict(load_dict['weight_optimizer'])
+            best_dice = load_dict['best_dice']
+            self.global_step = start_epoch * nBatch
+            print("Loaded model: ", self.save_path)
 
-        for epoch in range(self.config.max_epoch):
+
+        for epoch in range(start_epoch, self.config.max_epoch):
             print('\n', '-' * 30, 'Train epoch: %d' % (epoch + 1), '-' * 30, '\n')
-            save_frequency = 1
             validation_frequency = 1
             losses = AverageMeter()
             mae = AverageMeter()
             dice_score = AverageMeter()
-
             # switch to train mode
             net.train()
 
@@ -83,15 +92,11 @@ class Trainer():
                 self.writer.add_scalar("Loss/train", loss.item(), self.global_step)
                 self.writer.flush()
                 self.global_step += 1
-
                 # compute gradient and do SGD step
                 net.zero_grad()  # zero grads of weight_param, arch_param & binary_param
                 loss.backward()
                 optimizer.step()  # update weight parameters
 
-                if i % save_frequency == 0:
-                    # save model
-                    torch.save(net.state_dict(), self.save_path)
 
             # validate
             if (epoch + 1) % validation_frequency == 0:
@@ -102,6 +107,16 @@ class Trainer():
                 self.writer.add_scalar("Mae/train-val", val_mae, self.global_step)
                 self.writer.add_scalar("Dice/train-val", val_dice, self.global_step)
                 self.writer.flush()
+                if val_dice > best_dice:
+                    best_dice = val_dice
+                    torch.save(net.state_dict(), self.save_path + '_best')
+                save_dict = {
+                    'epoch': epoch+1,
+                    'weight_optimizer': optimizer.state_dict(),
+                    'state_dict': net.state_dict(),
+                    'best_dice': best_dice
+                }
+                torch.save(save_dict, self.save_path)
 
     def validate(self, net, writer=None, step=0):
         valid_dataset = TumorDataset(data_path=self.config.data_path, dataset='valid/')
@@ -181,6 +196,21 @@ class Trainer():
                     axs[4].imshow(attmaps[4][0,0,:,:,32].cpu().numpy(), cmap='jet')
                     axs[5].imshow(attmaps[5][0,0,:,:,32].cpu().numpy(), cmap='jet')
                     plt.savefig(f'tumor_surrogate_pytorch/attention_maps/{self.config.run_name}/maps_{step}.png')
+
+            Path(f'tumor_surrogate_pytorch/histograms/{self.config.run_name}').mkdir(parents=True, exist_ok=True)
+
+            fig, axs = plt.subplots(1, 3, sharey=True, tight_layout=True)
+            axs[0].hist(dice_score_02, bins=50)
+            axs[1].hist(dice_score_04, bins=50)
+            axs[2].hist(dice_score_08, bins=50)
+            plt.savefig(f'tumor_surrogate_pytorch/histograms/{self.config.run_name}/dice_{step}.png')
+
+            fig, axs = plt.subplots(1, 3, sharey=True, tight_layout=True)
+            axs[0].hist(mae_wm, bins=50)
+            axs[1].hist(mae_gm, bins=50)
+            axs[2].hist(mae_csf, bins=50)
+            plt.savefig(f'tumor_surrogate_pytorch/histograms/{self.config.run_name}/mae_{step}.png')
+
             return losses.avg, mae.avg, dice_score_avg.avg
 
 
