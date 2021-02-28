@@ -9,7 +9,7 @@ from tumor_surrogate_pytorch.utils import create_hists
 
 
 def load_weights(model, path):
-    model.load_state_dict(torch.load(path))
+    model.load_state_dict(torch.load(path)['state_dict'])
     model.eval()
     return model
 

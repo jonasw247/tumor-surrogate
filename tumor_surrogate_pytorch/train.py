@@ -168,7 +168,7 @@ class Trainer():
                 if writer is not None and i == 0:
                     grid = torchvision.utils.make_grid(torch.cat(ground_truths)[0:6, 0:1, :, :, 32])
                     writer.add_image('ground truths', grid, global_step=step)
-                    grid = torchvision.utils.make_grid(torch.cat(outputs)[0:6, 0:1, :, :, 32])
+                    grid = torchvision.utils.make_grid(torch.cat(outputs)[0:6, 0:1, :, :, 32], normalize=True)
                     writer.add_image('predictions', grid, global_step=step)
                     grid = torchvision.utils.make_grid(torch.cat(attmaps)[0:6, 0:1, :, :, 32])
                     writer.add_image('attmaps', grid, global_step=step)
