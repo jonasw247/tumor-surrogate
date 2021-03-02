@@ -34,7 +34,7 @@ class Trainer():
             param_group['lr'] = new_lr
 
     def train(self):
-        train_dataset = TumorDataset(data_path=self.config.data_path, dataset='tumor_mparam/v/', truncate=True)
+        train_dataset = TumorDataset(data_path=self.config.data_path, dataset='tumor_mparam/v/', truncate=False)
         data_loader = torch.utils.data.DataLoader(train_dataset, batch_size=self.config.train_batch_size,
                                                   num_workers=16, pin_memory=True, shuffle=True)
 

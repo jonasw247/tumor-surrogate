@@ -143,17 +143,27 @@ def create_hists(model, val_loader, device, save_path):
                 if dice_08 is not None:
                     dice_score_08.append(dice_08.item())
 
-
     print(sum(losses)/len(losses))
 
     Path(save_path).mkdir(parents=True, exist_ok=True)
 
+    #delete zeros
+
+    print("Dice 20: ", np.array(dice_score_02).mean())
+    print("Dice 20 no zeros: ", np.array(dice_score_02)[np.array(dice_score_02) > 0.001].mean())
+    print("Dice 40: ",np.array(dice_score_04).mean())
+    print("Dice 40 no zeros: ", np.array(dice_score_04)[np.array(dice_score_04) > 0.001].mean())
+    print("Dice 80: ",np.array(dice_score_08).mean())
+    print("Dice 80 no zeros: ", np.array(dice_score_08)[np.array(dice_score_08) > 0.001].mean())
     fig, axs = plt.subplots(1, 3, sharey=True, tight_layout=True)
     axs[0].hist(dice_score_02, bins=50)
     axs[1].hist(dice_score_04, bins=50)
     axs[2].hist(dice_score_08, bins=50)
     plt.savefig(save_path + 'dice.png')
 
+    print("MAE WM: ",np.array(mae_wm).mean())
+    print("MAE GM: ",np.array(mae_gm).mean())
+    print("MAE CSF: ",np.array(mae_csf).mean())
     fig, axs = plt.subplots(1, 3, sharey=True, tight_layout=True)
     axs[0].hist(mae_wm, bins=50)
     axs[1].hist(mae_gm, bins=50)
