@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import torch
 from matplotlib import pyplot as plt
-
+import pandas as pd
 
 class AverageMeter(object):
     """
@@ -91,6 +91,7 @@ def create_hists(model, val_loader, device, save_path):
     dice_score_04 = []
     dice_score_08 = []
     losses = []
+    data = []
 
     with torch.no_grad():
         print("Dataloader lenght: ", len(val_loader))
@@ -129,12 +130,14 @@ def create_hists(model, val_loader, device, save_path):
 
                 input = input.cpu()
                 mae_wm_value, mae_gm_value, mae_csf_value = mean_absolute_error(ground_truth=ground_truth, output=output, input=input)
-                if mae_wm_value is None:
-                    continue
+                if mae_wm_value is not None:
+                    mae_wm.append(mae_wm_value)
 
-                mae_wm.append(mae_wm_value)
-                mae_gm.append(mae_gm_value)
-                mae_csf.append(mae_csf_value)
+                if mae_gm_value is not None:
+                    mae_gm.append(mae_gm_value)
+
+                if mae_csf_value is not None:
+                    mae_csf.append(mae_csf_value)
 
                 if dice_02 is not None:
                     dice_score_02.append(dice_02.item())
@@ -142,6 +145,13 @@ def create_hists(model, val_loader, device, save_path):
                     dice_score_04.append(dice_04.item())
                 if dice_08 is not None:
                     dice_score_08.append(dice_08.item())
+
+                data.append([dice_to_num(dice_02),
+                             dice_to_num(dice_04),
+                             dice_to_num(dice_08),
+                             mae_to_num(mae_wm_value),
+                             mae_to_num(mae_gm_value),
+                             mae_to_num(mae_csf_value)])
 
     print(sum(losses)/len(losses))
 
@@ -169,3 +179,26 @@ def create_hists(model, val_loader, device, save_path):
     axs[1].hist(mae_gm, bins=50)
     axs[2].hist(mae_csf, bins=50)
     plt.savefig(save_path + 'mae.png')
+
+    data.append(['Dice20', np.array(dice_score_02).mean()])
+    data.append(['Dice20 no zeros', np.array(dice_score_02)[np.array(dice_score_02) > 0.001].mean()])
+    data.append(['Dice40', np.array(dice_score_04).mean()])
+    data.append(['Dice40 no zeros', np.array(dice_score_04)[np.array(dice_score_04) > 0.001].mean()])
+    data.append(['Dice80', np.array(dice_score_08).mean()])
+    data.append(['Dice80 no zeros', np.array(dice_score_08)[np.array(dice_score_08) > 0.001].mean()])
+    data.append(['MAE WM: ', np.array(mae_wm).mean()])
+    data.append(['MAE GM: ', np.array(mae_gm).mean()])
+    data.append(['MAE CSF: ', np.array(mae_csf).mean()])
+    df = pd.DataFrame(data, columns=['Dice20', 'Dice40', 'Dice80', 'MAE WM', 'MAE GM', 'MAE CSF'])
+    df.to_csv(save_path + 'stats.csv')
+def mae_to_num(mae):
+    if mae is None:
+        return 'None'
+    else:
+        return mae
+
+def dice_to_num(dice):
+    if dice is None:
+        return 'None'
+    else:
+        return dice.item()
