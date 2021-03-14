@@ -11,14 +11,14 @@ from tumor_surrogate_pytorch.utils import create_hists
 
 
 def load_weights(model, path):
-    model.load_state_dict(torch.load(path)['state_dict'])
+    model.load_state_dict(torch.load(path))
     model.eval()
     return model
 
 
 def test(data_path, run_name):
     net = TumorSurrogate(widths=[128, 128, 128, 128], n_cells=[5, 5, 5, 4], strides=[2, 2, 2, 1])
-    os.environ['CUDA_VISIBLE_DEVICES'] = "5"
+    os.environ['CUDA_VISIBLE_DEVICES'] = "4"
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     net = net.to(device=device)
 

@@ -66,20 +66,31 @@ def compute_dice_score(u_pred, u_sim, threshold):
         return None
     return torch.mean(2 * tp / (tpfn + tpfp))
 
-def mean_absolute_error(ground_truth, output, input):
+def mean_absolute_error_helper(y_true, y_pred):
+    return np.mean(np.abs(y_true - y_pred))
+
+def mean_absolute_error2(ground_truth, output, input):
+
+    input[:, 0][input[:, 0] >= 0.35] = 1
+    input[:, 0][input[:, 0] < 0.35] = 0
+    input[:, 1][input[:, 1] > 0.3] = 1
+    input[:, 1][input[:, 1] <= 0.3] = 0
+    input[:, 1][input[:, 0] >= 0.35] = 0
+
     ground_truth = np.array(ground_truth[:, 0].detach().cpu())
     output = np.array(output[:, 0].detach().cpu())
     input = input.cpu()
     wm = np.ma.masked_where(np.logical_and(input[:, 0] > 0.0001, ground_truth > 0.0001), input[:, 0])
+    mae_wm = mean_absolute_error_helper(output[wm.mask].ravel(), ground_truth[wm.mask].ravel())
+
     gm = np.ma.masked_where(np.logical_and(input[:, 1] > 0.0001, ground_truth > 0.0001), input[:, 1])
+    mae_gm = mean_absolute_error_helper(output[gm.mask].ravel(), ground_truth[gm.mask].ravel())
+
     csf = np.ma.masked_where(np.logical_and(input[:, 2] > 0.0001, output > 0.0001), input[:, 2])
-    if wm.mask.sum() == 0 or gm.mask.sum() == 0 or csf.mask.sum() == 0:
-        return None, None, None
-    mae_wm = np.mean(np.abs(output[wm.mask].ravel() - ground_truth[wm.mask].ravel()))
-    mae_gm = np.mean(np.abs(output[gm.mask].ravel() - ground_truth[gm.mask].ravel()))
-    mae_csf = np.mean(np.abs(output[csf.mask].ravel() - ground_truth[csf.mask].ravel()))
+    mae_csf = mean_absolute_error_helper(output[csf.mask].ravel(), ground_truth[csf.mask].ravel())
 
     return mae_wm, mae_gm, mae_csf
+
 
 
 def create_hists(model, val_loader, device, save_path):
@@ -129,7 +140,9 @@ def create_hists(model, val_loader, device, save_path):
                 dice_08 = compute_dice_score(u_pred=output, u_sim=ground_truth, threshold=0.8)
 
                 input = input.cpu()
-                mae_wm_value, mae_gm_value, mae_csf_value = mean_absolute_error(ground_truth=ground_truth, output=output, input=input)
+                #mae_wm_value0, mae_gm_value0, mae_csf_value0 = mean_absolute_error(ground_truth=ground_truth, output=output, input=input)
+                mae_wm_value, mae_gm_value, mae_csf_value = mean_absolute_error2(ground_truth=ground_truth, output=output, input=input)
+
                 if mae_wm_value is not None:
                     mae_wm.append(mae_wm_value)
 
