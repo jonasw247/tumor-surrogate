@@ -1,15 +1,24 @@
 import glob
 
 import numpy as np
-import torch
 import os
+import torch
 
 from tumor_surrogate_pytorch.model import TumorSurrogate
+
 
 def load_weights(model, path):
     model.load_state_dict(torch.load(path, map_location='cpu'))
     model.eval()
     return model
+
+
+def simulate_parameters_from_uniform(parameters):
+    parameters[0] = parameters[0] * 0.0007 + 0.0001
+    parameters[2] = parameters[1] * 0.0299 + 0.0001
+    parameters[3] = int(parameters[2] * 20 + 1)
+    return parameters
+
 
 class Simulator():
     def __init__(self):
@@ -25,22 +34,39 @@ class Simulator():
         self.net = self.net.to(device=self.device)
         self.net.eval()
 
+    def uncrop(self, x, center_x, center_y, center_z):
+        center_x = int(round(center_x * 128))
+        center_y = int(round(center_y * 128))
+        center_z = int(round(center_z * 128))
+
+        out = torch.zeros([1, 1, 128, 128, 128])
+        out[:, :, center_x - 32:center_x + 32,
+        center_y - 32:center_y + 32,
+        center_z - 32:center_z + 32] = x
+
+        return out
 
     def predict_tumor_density(self, parameters):
+        parameters = simulate_parameters_from_uniform(parameters)
         # random patient anatomy
-        anatomy = self.anatomy_dataset.getitem(center_x=parameters[3],
-                                               center_y=parameters[4],
-                                               center_z=parameters[5])
+        center_x = parameters[3]
+        center_y = parameters[4]
+        center_z = parameters[5]
+        anatomy = self.anatomy_dataset.getitem(center_x=center_x,
+                                               center_y=center_y,
+                                               center_z=center_z)
         # call tumor simulator net and predict density
-        parameters =  torch.tensor(parameters).float()
+        parameters = torch.tensor(parameters).float()
         anatomy, parameters = anatomy.to(self.device), parameters.to(self.device)
-        anatomy = anatomy[None,:]
+        anatomy = anatomy[None, :]
         parameters = parameters[None, 0:3]
         output_batch, _ = self.net(anatomy, parameters[None, 0:3])
 
-        # threshold at 0.25 and 0.5
-        thresholded_025 = output_batch.copy()
-        thresholded_07 = output_batch.copy()
+        output_batch = self.uncrop(output_batch, center_x=center_x, center_y=center_y, center_z=center_z)
+
+        # threshold at 0.25 and 0.7
+        thresholded_025 = output_batch.clone()
+        thresholded_07 = output_batch.clone()
 
         thresholded_025[thresholded_025 >= 0.25] = 1
         thresholded_025[thresholded_025 < 0.25] = 0
@@ -48,7 +74,7 @@ class Simulator():
         thresholded_07[thresholded_07 >= 0.7] = 1
         thresholded_07[thresholded_07 < 0.7] = 0
 
-        output = thresholded_025+thresholded_07
+        output = thresholded_025 + thresholded_07
         return output
 
 
@@ -80,6 +106,6 @@ if __name__ == '__main__':
 
     sim = Simulator()
     parameters = np.array([2.30e-04, 1.94e-02, 1.60e+01, 4.37e-01, 5.36e-01, 4.91e-01])
-    #0.00023, 0.019, 16, 0.43, 0.53, 0.49
+    # 0.00023, 0.019, 16, 0.43, 0.53, 0.49
     sim.predict_tumor_density(parameters)
     a = 1

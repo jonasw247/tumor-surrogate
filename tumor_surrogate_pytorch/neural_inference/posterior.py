@@ -21,7 +21,7 @@ class NPE:
         self.posteriors = []
 
     def forward(self, x_ob, num_rounds, num_simulations):
-        inference = APT(prior=self.prior)
+        inference = APT(prior=self.prior) #TODO set correct density estimator or self-defined model
         simulator, prior = prepare_for_sbi(self.simulator, self.prior)
         proposal = prior
         for _ in range(num_rounds):
@@ -32,4 +32,8 @@ class NPE:
             proposal = posterior.set_default_x(x_ob)
 
 if __name__ == '__main__':
-    print("hier")
+    simulator = Simulator()
+    npe = NPE(simulator = simulator)
+    x_ob = np.load('tumor_surrogate_pytorch/neural_inference/x_obs_test.npz')
+    x_ob = x_ob['x_025'] + x_ob['x_07']
+    posterior = npe.forward(x_ob=x_ob, num_rounds=10, num_simulations=500)
