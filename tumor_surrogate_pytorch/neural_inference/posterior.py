@@ -1,7 +1,10 @@
 import sbi
 import torch
+import numpy as np
 from sbi import utils
 from sbi.inference import simulate_for_sbi, prepare_for_sbi, APT
+
+from tumor_surrogate_pytorch.neural_inference.simulator import Simulator
 
 
 def simulate_parameters_from_uniform(parameters):
