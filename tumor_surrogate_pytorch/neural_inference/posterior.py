@@ -15,7 +15,7 @@ class NPE:
         self.posteriors = []
 
     def forward(self, x_ob, num_rounds, num_simulations):
-        inference = APT(prior=self.prior)
+        inference = APT(prior=self.prior) #TODO set correct density estimator or self-defined model
         simulator, prior = prepare_for_sbi(self.simulator, self.prior)
         proposal = prior
         posterior = None
