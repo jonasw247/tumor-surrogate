@@ -1,3 +1,5 @@
+import os
+
 import sbi
 import torch
 import numpy as np
@@ -26,6 +28,7 @@ class NPE:
             proposal = posterior.set_default_x(x_ob)
 
 if __name__ == '__main__':
+    os.environ['CUDA_VISIBLE_DEVICES'] = "7"
     simulator = Simulator()
     npe = NPE(simulator = simulator)
     x_ob = np.load('tumor_surrogate_pytorch/neural_inference/x_obs_test.npz')
