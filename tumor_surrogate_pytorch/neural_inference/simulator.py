@@ -39,7 +39,7 @@ class Simulator():
         center_y = int(round(center_y * 128))
         center_z = int(round(center_z * 128))
 
-        out = torch.zeros([1, 3, 128, 128, 128])
+        out = torch.zeros([1, 1, 128, 128, 128])
         out[:, :, center_x - 32:center_x + 32,
         center_y - 32:center_y + 32,
         center_z - 32:center_z + 32] = x
@@ -65,8 +65,8 @@ class Simulator():
         output_batch = self.uncrop(output_batch, center_x=center_x, center_y=center_y, center_z=center_z)
 
         # threshold at 0.25 and 0.7
-        thresholded_025 = output_batch.copy()
-        thresholded_07 = output_batch.copy()
+        thresholded_025 = output_batch.clone()
+        thresholded_07 = output_batch.clone()
 
         thresholded_025[thresholded_025 >= 0.25] = 1
         thresholded_025[thresholded_025 < 0.25] = 0
