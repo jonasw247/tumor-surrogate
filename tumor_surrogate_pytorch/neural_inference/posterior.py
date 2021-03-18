@@ -15,15 +15,19 @@ class NPE:
         self.posteriors = []
 
     def forward(self, x_ob, num_rounds, num_simulations):
+        print("Starting forward")
         inference = APT(prior=self.prior) #TODO set correct density estimator or self-defined model
         simulator, prior = prepare_for_sbi(self.simulator, self.prior)
         proposal = prior
-        for _ in range(num_rounds):
+        for i in range(num_rounds):
+            print("Round: ", i)
             theta, x = simulate_for_sbi(simulator, proposal, num_simulations=num_simulations)
             density_estimator = inference.append_simulations(theta, x, proposal=proposal).train()
             posterior = inference.build_posterior(density_estimator)
             self.posteriors.append(posterior)
             proposal = posterior.set_default_x(x_ob)
+            print("MAP: ", posterior.map())
+        return posterior
 
 if __name__ == '__main__':
     simulator = Simulator()
