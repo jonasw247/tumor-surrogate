@@ -15,8 +15,10 @@ def load_weights(model, path):
 
 def simulate_parameters_from_uniform(parameters):
     parameters[0] = parameters[0] * 0.0007 + 0.0001
-    parameters[2] = parameters[1] * 0.0299 + 0.0001
-    parameters[3] = int(parameters[2] * 20 + 1)
+    parameters[1] = parameters[1] * 0.0299 + 0.0001
+    parameters[2] = int(parameters[2] * 20 + 1)
+    parameters[6] = parameters[6] * 0.2 + 0.6
+    parameters[7] = parameters[7] * 0.55 + 0.05
     return parameters
 
 
