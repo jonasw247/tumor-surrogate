@@ -52,6 +52,8 @@ class Simulator():
         center_x = parameters[3]
         center_y = parameters[4]
         center_z = parameters[5]
+        threshold07 = parameters[6]
+        threshold025 = parameters[7]
         anatomy = self.anatomy_dataset.getitem(center_x=center_x,
                                                center_y=center_y,
                                                center_z=center_z)
@@ -68,11 +70,11 @@ class Simulator():
         thresholded_025 = output_batch.clone()
         thresholded_07 = output_batch.clone()
 
-        thresholded_025[thresholded_025 >= 0.25] = 1
-        thresholded_025[thresholded_025 < 0.25] = 0
+        thresholded_025[thresholded_025 >= threshold025] = 1
+        thresholded_025[thresholded_025 < threshold025] = 0
 
-        thresholded_07[thresholded_07 >= 0.7] = 1
-        thresholded_07[thresholded_07 < 0.7] = 0
+        thresholded_07[thresholded_07 >= threshold07] = 1
+        thresholded_07[thresholded_07 < threshold07] = 0
 
         output = thresholded_025 + thresholded_07
         return output
@@ -105,7 +107,7 @@ if __name__ == '__main__':
     item = ds.getitem(0.5, 0.5, 0.5)
 
     sim = Simulator()
-    parameters = np.array([2.30e-04, 1.94e-02, 1.60e+01, 4.37e-01, 5.36e-01, 4.91e-01])
+    parameters = np.array([2.30e-04, 1.94e-02, 1.60e+01, 4.37e-01, 5.36e-01, 4.91e-01, 0.25, 0.7])
     # 0.00023, 0.019, 16, 0.43, 0.53, 0.49
     sim.predict_tumor_density(parameters)
     a = 1
