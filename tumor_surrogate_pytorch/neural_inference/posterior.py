@@ -18,7 +18,7 @@ class NPE:
 
     def forward(self, x_ob, num_rounds, num_simulations):
         print("Starting forward")
-        inference = APT(prior=self.prior) #TODO set correct density estimator or self-defined model
+        inference = APT(prior=self.prior, device='cuda') #TODO set correct density estimator or self-defined model
         simulator, prior = prepare_for_sbi(self.simulator, self.prior)
         proposal = prior
         for i in range(num_rounds):
@@ -34,7 +34,8 @@ class NPE:
 if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = "7"
     simulator = Simulator()
-    npe = NPE(simulator = simulator)
+    npe = NPE(simulator = simulator.predict_tumor_density)
     x_ob = np.load('tumor_surrogate_pytorch/neural_inference/x_obs_test.npz')
     x_ob = x_ob['x_025'] + x_ob['x_07']
-    posterior = npe.forward(x_ob=x_ob, num_rounds=10, num_simulations=500)
+    x_ob = x_ob.flatten()
+    posterior = npe.forward(x_ob=x_ob, num_rounds=10, num_simulations=10)

@@ -18,6 +18,10 @@ def simulate_parameters_from_uniform(parameters):
     parameters[1] = parameters[1] * 0.0299 + 0.0001
     parameters[2] = int(parameters[2] * 20 + 1)
     parameters[6] = parameters[6] * 0.2 + 0.6
+    parameters[3] = parameters[3] * 0.5 + 0.25
+    parameters[4] = parameters[4] * 0.5 + 0.25
+    parameters[5] = parameters[5] * 0.5 + 0.25
+
     parameters[7] = parameters[7] * 0.55 + 0.05
     return parameters
 
@@ -37,9 +41,9 @@ class Simulator():
         self.net.eval()
 
     def uncrop(self, x, center_x, center_y, center_z):
-        center_x = int(round(center_x * 128))
-        center_y = int(round(center_y * 128))
-        center_z = int(round(center_z * 128))
+        center_x = int(round(center_x.item() * 128))
+        center_y = int(round(center_y.item() * 128))
+        center_z = int(round(center_z.item() * 128))
 
         out = torch.zeros([1, 1, 128, 128, 128])
         out[:, :, center_x - 32:center_x + 32,
@@ -64,7 +68,8 @@ class Simulator():
         anatomy, parameters = anatomy.to(self.device), parameters.to(self.device)
         anatomy = anatomy[None, :]
         parameters = parameters[None, 0:3]
-        output_batch, _ = self.net(anatomy, parameters[None, 0:3])
+        with torch.no_grad():
+            output_batch, _ = self.net(anatomy, parameters[None, 0:3])
 
         output_batch = self.uncrop(output_batch, center_x=center_x, center_y=center_y, center_z=center_z)
 
@@ -79,6 +84,7 @@ class Simulator():
         thresholded_07[thresholded_07 < threshold07] = 0
 
         output = thresholded_025 + thresholded_07
+        output = output.flatten()
         return output
 
 
@@ -88,9 +94,9 @@ class BrainAnatomyDataset:
         self.samples = sorted(glob.glob(data_path + '*'))
 
     def crop(self, x, center_x, center_y, center_z):
-        center_x = int(round(center_x * 128))
-        center_y = int(round(center_y * 128))
-        center_z = int(round(center_z * 128))
+        center_x = int(round(center_x.item() * 128))
+        center_y = int(round(center_y.item() * 128))
+        center_z = int(round(center_z.item() * 128))
         return x[center_x - 32:center_x + 32,
                center_y - 32:center_y + 32,
                center_z - 32:center_z + 32]
