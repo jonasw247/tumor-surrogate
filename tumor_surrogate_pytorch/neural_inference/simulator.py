@@ -38,7 +38,7 @@ class Simulator():
         parameters = parameters[None, 0:3]
         output_batch, _ = self.net(anatomy, parameters[None, 0:3])
 
-        # threshold at 0.25 and 0.5
+        # threshold at 0.25 and 0.7
         thresholded_025 = output_batch.copy()
         thresholded_07 = output_batch.copy()
 
