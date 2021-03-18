@@ -3,7 +3,7 @@
 # create dataset with only patient anatomies (10 patients from train-set)
 
 #TODO SBI
-# TODO Simulation dataloader -> sample params, get wm/gm/csf input from train set
-# TODO write Simulator class using our trained model
-# TODO prior
-# TODO create sbi enviroment -> simulator, prior, loop etc
+# Simulation dataloader -> sample params, get wm/gm/csf input from train set
+# write Simulator class using our trained model
+# prior
+# create sbi enviroment -> simulator, prior, loop etc
