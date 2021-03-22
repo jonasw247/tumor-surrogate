@@ -31,7 +31,6 @@ class Simulator():
         self.anatomy_dataset = BrainAnatomyDataset()
 
         self.net = TumorSurrogate(widths=[128, 128, 128, 128], n_cells=[5, 5, 5, 4], strides=[2, 2, 2, 1])
-        os.environ['CUDA_VISIBLE_DEVICES'] = "7"
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         if os.path.exists(f'./tumor_surrogate_pytorch/saved_model/whole_dataset_orig_loss_best'):
@@ -45,7 +44,7 @@ class Simulator():
         center_y = int(round(center_y.item() * 128))
         center_z = int(round(center_z.item() * 128))
 
-        out = torch.zeros([1, 1, 128, 128, 128])
+        out = torch.zeros([1, 1, 128, 128, 128]).to(torch.device('cuda'))
         out[:, :, center_x - 32:center_x + 32,
         center_y - 32:center_y + 32,
         center_z - 32:center_z + 32] = x

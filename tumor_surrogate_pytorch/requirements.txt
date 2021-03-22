@@ -4,3 +4,4 @@ numpy
 tensorboard
 matplotlib
 sbi
+gputil
