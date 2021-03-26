@@ -9,7 +9,7 @@ from pyknos.nflows import distributions as distributions_
 
 
 class ConvNet(nn.Module):
-    def __init__(self):
+    def __init__(self, device):
         super(ConvNet, self).__init__()
         self.net = nn.Sequential(
             nn.Conv3d(in_channels=1, out_channels=64, kernel_size=(3,3,3), padding=(1,1,1), stride=(2,2,2)),
@@ -33,9 +33,11 @@ class ConvNet(nn.Module):
             nn.AdaptiveAvgPool3d((1,1,1))
         )
 
+        self.net.to(device=device)
+
     def forward(self, x):
         x = x.view(-1,1,128,128,128)
-        return self.net(x).squeeze()
+        return self.net(x)[:,:,0,0,0]
 
 class DE(nn.Module):
     """Implementation of MADE.
