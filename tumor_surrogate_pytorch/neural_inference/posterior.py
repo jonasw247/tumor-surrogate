@@ -7,11 +7,24 @@ from sbi.inference import simulate_for_sbi, prepare_for_sbi, APT
 
 from tumor_surrogate_pytorch.neural_inference.embedding_net import ConvNet
 from tumor_surrogate_pytorch.neural_inference.simulator import Simulator
+import matplotlib.pyplot as plt
 
 def print_gpu_utilisation():
     gpu = GPUtil.getGPUs()[1]
     print(f'{gpu.memoryUsed} MB allocated\n')
 
+def plot_probabilities(ranges, gts, posterior, device):
+    steps = 100
+    for i, r in enumerate(ranges):
+        x = np.linspace(r[0],r[1],steps)
+        theta = np.tile(gts,(steps,1))
+        theta[:,i] = x
+        theta = torch.from_numpy(theta.astype(np.float32)).to(device)
+        #plt.locator_params(axis="x", nbins=10)
+        probs = np.exp(posterior.log_prob(theta, norm_posterior=False).cpu().numpy())
+        plt.axvline(x=gts[i], linestyle='dotted', color='red')
+        plt.plot(x, probs)
+        plt.show()
 
 class NPE:
     def __init__(self, simulator, device):
@@ -21,7 +34,7 @@ class NPE:
         self.simulator = simulator
         self.posteriors = []
 
-    def forward(self, x_ob, num_rounds, num_simulations):
+    def forward(self, x_ob, num_rounds, num_simulations, ranges, gts):
         print("Starting forward")
         neural_posterior = utils.posterior_nn(model='maf',
                                               embedding_net=ConvNet(device=self.device))
@@ -38,6 +51,7 @@ class NPE:
                                                   rejection_sampling_parameters={'max_sampling_batch_size': 50})
             self.posteriors.append(posterior)
             proposal = posterior.set_default_x(x_ob)
+            plot_probabilities(ranges, gts, proposal, device)
             map = proposal.map(num_init_samples=50, num_to_optimize=25, show_progress_bars=False)
             print(map)
         return posterior
