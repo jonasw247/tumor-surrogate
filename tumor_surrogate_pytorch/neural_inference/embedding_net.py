@@ -27,7 +27,7 @@ class ConvNet(nn.Module):
             nn.AdaptiveAvgPool3d((1,1,1))
         )
 
-        self.net.to(device=device)
+        #self.net.to(device=device)
 
     def forward(self, x):
         if x.shape[0] > 50:

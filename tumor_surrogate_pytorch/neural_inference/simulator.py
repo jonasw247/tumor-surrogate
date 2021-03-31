@@ -94,7 +94,7 @@ class Simulator():
 
             output = thresholded_025 + thresholded_07
             output = output.view(output.shape[0], -1)
-            return output
+            return output.cpu()
 
 
 class BrainAnatomyDataset:
