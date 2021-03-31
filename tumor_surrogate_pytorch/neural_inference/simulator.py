@@ -57,9 +57,15 @@ class Simulator():
             if len(parameters.shape) == 1:
                 parameters = parameters[None]
             parameters = parameters.to(self.device)
+            parameters_net = parameters[:, 0:3].clone()
+            parameters_net[:, 2] = torch.round(parameters_net[:, 2] * 20 + 1)
+            y_range = [[0.0003, 0.0009], [0.0051, 0.0299], [0.0, 20.0]]
+            for i, ri in enumerate(y_range):
+                parameters_net[:,i] = (parameters_net[:,i] - ri[0]) / (ri[1] - ri[0]) * 2 - 1
+                parameters_net[:,i] = torch.round(parameters_net[:,i] * 10 ** 2) / 10 ** 2
             #parameters = simulate_parameters_from_uniform(parameters)
             #parameters = torch.tensor(parameters).float()
-            parameters[:,2] = torch.round(parameters[:,2] * 20 + 1)
+
             # random patient anatomy
             center_x = parameters[:,3]
             center_y = parameters[:,4]
@@ -71,8 +77,8 @@ class Simulator():
                                                    center_z=center_z)
             # call tumor simulator net and predict density
             anatomy = anatomy.to(self.device)
-            parameters = parameters[:, 0:3]
-            output_batch, _ = self.net(anatomy, parameters)
+
+            output_batch, _ = self.net(anatomy, parameters_net)
 
             output_batch = self.uncrop(output_batch, center_x=center_x, center_y=center_y, center_z=center_z)
 
