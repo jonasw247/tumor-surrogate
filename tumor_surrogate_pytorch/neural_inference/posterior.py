@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import GPUtil
 import numpy as np
 import os
@@ -70,6 +72,17 @@ class NPE:
         with open(path, "rb") as handle:
             posterior = pickle.load(handle)
         return posterior
+
+    def save_state(self, posterior, round, run_name):
+        Path(f'tumor_surrogate_pytorch/neural_inference/{run_name}/state').mkdir(parents=True, exist_ok=True)
+        Path(f'tumor_surrogate_pytorch/neural_inference/{run_name}/posterior').mkdir(parents=True, exist_ok=True)
+        posterior_path = f'tumor_surrogate_pytorch/neural_inference/{run_name}/posterior/round_{i}.pkl'
+        save_dict = {
+            'round': round,
+            'posterior_path': f'tumor_surrogate_pytorch/neural_inference/{run_name}/posterior/round_{i}.pkl'
+        }
+        self.save_posterior(posterior,posterior_path)
+        torch.save(save_dict, f'tumor_surrogate_pytorch/neural_inference/{run_name}/state/round_{i}')
 
     def bayesian_inference(self, num_samples, proposal):
         thetas = proposal.sample((num_samples,))
