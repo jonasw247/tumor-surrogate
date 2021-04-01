@@ -52,7 +52,7 @@ class Simulator():
 
         return out
 
-    def predict_tumor_density(self, parameters):
+    def predict_tumor_label_map(self, parameters):
         with torch.no_grad():
             if len(parameters.shape) == 1:
                 parameters = parameters[None]
@@ -96,6 +96,36 @@ class Simulator():
             output = output.view(output.shape[0], -1)
             return output.cpu()
 
+    def predict_tumor_density(self, parameters):
+        with torch.no_grad():
+            if len(parameters.shape) == 1:
+                parameters = parameters[None]
+            parameters = parameters.to(self.device)
+            parameters_net = parameters[:, 0:3].clone()
+            parameters_net[:, 2] = torch.round(parameters_net[:, 2] * 20 + 1)
+            y_range = [[0.0003, 0.0009], [0.0051, 0.0299], [0.0, 20.0]]
+            for i, ri in enumerate(y_range):
+                parameters_net[:,i] = (parameters_net[:,i] - ri[0]) / (ri[1] - ri[0]) * 2 - 1
+                parameters_net[:,i] = torch.round(parameters_net[:,i] * 10 ** 2) / 10 ** 2
+
+            # random patient anatomy
+            center_x = parameters[:,3]
+            center_y = parameters[:,4]
+            center_z = parameters[:,5]
+            threshold07 = parameters[:,6]
+            threshold025 = parameters[:,7]
+            anatomy = self.anatomy_dataset.getitem(center_x=center_x,
+                                                   center_y=center_y,
+                                                   center_z=center_z)
+            # call tumor simulator net and predict density
+            anatomy = anatomy.to(self.device)
+
+            output_batch, _ = self.net(anatomy, parameters_net)
+
+            return output_batch.sum(dim=0).cpu()
+
+
+
 
 class BrainAnatomyDataset:
     def __init__(self, device):
@@ -130,5 +160,5 @@ if __name__ == '__main__':
     sim = Simulator()
     parameters = np.array([2.30e-04, 1.94e-02, 1.60e+01, 4.37e-01, 5.36e-01, 4.91e-01, 0.25, 0.7])
     # 0.00023, 0.019, 16, 0.43, 0.53, 0.49
-    sim.predict_tumor_density(parameters)
+    sim.predict_tumor_label_map(parameters)
     a = 1

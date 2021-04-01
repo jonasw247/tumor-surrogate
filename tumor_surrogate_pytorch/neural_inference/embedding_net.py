@@ -30,7 +30,7 @@ class ConvNet(nn.Module):
         #self.net.to(device=device)
 
     def forward(self, x):
-        if x.shape[0] > 50:
-            warn("Embedding Net batchsize is greater 50.")
+        if x.shape[0] > 100:
+            warn("Embedding Net batchsize is greater 100.")
         x = x.view(-1,1,128,128,128)
         return self.net(x)[:,:,0,0,0]
