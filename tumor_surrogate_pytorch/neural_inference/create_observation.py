@@ -1,5 +1,22 @@
 import numpy as np
 from matplotlib import pyplot as plt
+import torch
+
+def crop(x, center_x, center_y, center_z):
+    center_x = int(round(center_x.item() * 128))
+    center_y = int(round(center_y.item() * 128))
+    center_z = int(round(center_z.item() * 128))
+    return x[center_x - 32:center_x + 32,
+           center_y - 32:center_y + 32,
+           center_z - 32:center_z + 32, :]
+
+def get_gt_img(sample_name = '10_13_16'):
+    data_path = f'/mnt/Drive2/ivan/deept/data/valid/{sample_name}.npz'
+    data = np.load(data_path)
+    parameters = data['y']
+    output = data['x'][:, :, :, 0:1]
+    output = crop(output, parameters[3], parameters[4], parameters[5])
+    return torch.tensor(output).permute(3,0,1,2)
 
 if __name__ == '__main__':
     # sample 87
