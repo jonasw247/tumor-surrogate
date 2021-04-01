@@ -27,6 +27,7 @@ arg_lists = []
 parser = argparse.ArgumentParser()
 parser.add_argument('--rounds', type=int, default=10)
 parser.add_argument('--num_simulations', type=int, default=5000)
+parser.add_argument('--start_round', type=int, default=None)
 
 parser.add_argument('--run_name', type=str, default='debug')
 parser.add_argument('--gpu', type=str, default='0')
@@ -37,48 +38,21 @@ def print_gpu_utilisation():
     gpu = GPUtil.getGPUs()[1]
     print(f'{gpu.memoryUsed} MB allocated\n')
 
-def plot_probabilities(ranges, gts, posterior, device, round):
-    steps = 100
-    for i, r in enumerate(ranges):
-        x = np.linspace(r[0],r[1],steps)
-        theta = np.tile(gts,(steps,1))
-        theta[:,i] = x
-        theta = torch.from_numpy(theta.astype(np.float32)).to(device)
-        #plt.locator_params(axis="x", nbins=10)
-        probs = np.exp(posterior.log_prob(theta).cpu().numpy())
-        if i == 2:
-            x = x * 20 + 1
-        plt.axvline(x=gts[i], linestyle='dotted', color='red')
-        plt.plot(x, probs)
-        plt.savefig(f'tumor_surrogate_pytorch/neural_inference/plots/round_{round}_paramerter_{i}.png')
-        plt.clf()
-        plt.close()
-
-def plot_probabilities_2(ranges, gts, posterior, device, round):
-    steps = 100
-    for i, r in enumerate(ranges):
-        x = np.linspace(r[0]+1e-32,r[1]-1e-32,steps)
-        probs = eval_conditional_density(posterior, torch.tensor(gts, device=device), torch.tensor(ranges, device=device), dim1=i, dim2=i, resolution=steps)
-        #plt.locator_params(axis="x", nbins=10)
-        if i == 2:
-            x = x * 20 + 1
-            plt.axvline(x=gts[i]*20+1, linestyle='dotted', color='red')
-        else:
-            plt.axvline(x=gts[i], linestyle='dotted', color='red')
-        plt.plot(x, probs.cpu().numpy())
-        plt.savefig(f'tumor_surrogate_pytorch/neural_inference/plots/round_{round}_paramerter_{i}.png')
-        plt.clf()
-        plt.close()
 
 class NPE:
-    def __init__(self, simulator, device, log_path, run_name, posterior_path=None):
+    def __init__(self, simulator, device, log_path, run_name, gts, ranges):
         self.device = device
         self.prior = utils.BoxUniform(low=torch.tensor([0.0001, 0.0001, 0, 0.4, 0.4, 0.4, 0.6, 0.05], device=device),
                                       high=torch.tensor([0.0008, 0.03, 1, 0.6, 0.6, 0.6, 0.8, 0.6], device=device))
-        self.posterior_path = posterior_path
         self.simulator = simulator
         self.posteriors = []
         self.writer = SummaryWriter(log_dir=log_path+run_name)
+        self.run_name = run_name
+        self.gts = gts
+        self.ranges = ranges
+        Path(f'tumor_surrogate_pytorch/neural_inference/output/{run_name}/state').mkdir(parents=True, exist_ok=True)
+        Path(f'tumor_surrogate_pytorch/neural_inference/output/{run_name}/posterior').mkdir(parents=True, exist_ok=True)
+        Path(f'tumor_surrogate_pytorch/neural_inference/output/{run_name}/plots').mkdir(parents=True, exist_ok=True)
 
     def save_posterior(self, posterior, path):
         with open(path, "wb") as handle:
@@ -89,16 +63,42 @@ class NPE:
             posterior = pickle.load(handle)
         return posterior
 
-    def save_state(self, posterior, round, run_name):
-        Path(f'tumor_surrogate_pytorch/neural_inference/{run_name}/state').mkdir(parents=True, exist_ok=True)
-        Path(f'tumor_surrogate_pytorch/neural_inference/{run_name}/posterior').mkdir(parents=True, exist_ok=True)
-        posterior_path = f'tumor_surrogate_pytorch/neural_inference/{run_name}/posterior/round_{i}.pkl'
+    def save_state(self, posterior, round, num_simulations):
+        posterior_path = f'tumor_surrogate_pytorch/neural_inference/output/{self.run_name}/posterior/round_{round}.pkl'
         save_dict = {
             'round': round,
-            'posterior_path': f'tumor_surrogate_pytorch/neural_inference/{run_name}/posterior/round_{i}.pkl'
+            'num_simulations': num_simulations,
+            'posterior_path': f'tumor_surrogate_pytorch/neural_inference/output/{self.run_name}/posterior/round_{round}.pkl'
         }
         self.save_posterior(posterior,posterior_path)
-        torch.save(save_dict, f'tumor_surrogate_pytorch/neural_inference/{run_name}/state/round_{i}')
+        torch.save(save_dict, f'tumor_surrogate_pytorch/neural_inference/output/{self.run_name}/state/round_{round}')
+
+    def load_state(self, round):
+        state_path = f'tumor_surrogate_pytorch/neural_inference/output/{self.run_name}/state/round_{round}'
+        load_dict = torch.load(state_path)
+        round = load_dict['round']+1
+        num_simulations = load_dict['num_simulations']
+        posterior_path = load_dict['posterior_path']
+        posterior = self.load_posterior(posterior_path)
+        print("Loading posterior from: ", posterior_path)
+        return posterior, round, num_simulations
+
+    def plot_probabilities(self, posterior, round):
+        steps = 100
+        for i, r in enumerate(self.ranges):
+            x = np.linspace(r[0] + 1e-32, r[1] - 1e-32, steps)
+            probs = eval_conditional_density(posterior, torch.tensor(self.gts, device=self.device),
+                                             torch.tensor(self.ranges, device=self.device), dim1=i, dim2=i, resolution=steps)
+            # plt.locator_params(axis="x", nbins=10)
+            if i == 2:
+                x = x * 20 + 1
+                plt.axvline(x=self.gts[i] * 20 + 1, linestyle='dotted', color='red')
+            else:
+                plt.axvline(x=self.gts[i], linestyle='dotted', color='red')
+            plt.plot(x, probs.cpu().numpy())
+            plt.savefig(f'tumor_surrogate_pytorch/neural_inference/output/{self.run_name}/plots/round_{round}_paramerter_{i}.png')
+            plt.clf()
+            plt.close()
 
     def bayesian_inference(self, num_samples, proposal):
         thetas = proposal.sample((num_samples,))
@@ -110,7 +110,7 @@ class NPE:
         tumor_density /= num_samples
         return tumor_density
 
-    def forward(self, x_ob, num_rounds, num_simulations, ranges, gts):
+    def forward(self, x_ob, num_rounds, num_simulations, start_round=None):
         print("Starting forward")
         neural_posterior = utils.posterior_nn(model='maf',
                                               embedding_net=ConvNet(device=self.device))
@@ -121,22 +121,25 @@ class NPE:
         gt = get_gt_img(sample_name = '10_13_16')
         self.writer.add_image('ground truth', gt[0:1, :, :, 32], global_step=0)
 
-        if self.posterior_path is not None:
-            proposal = self.load_posterior(self.posterior_path).set_default_x(x_ob)
+        round = 0
+        if start_round is not None:
+            posterior, round, num_simulations = self.load_state(start_round)
+            proposal = posterior.set_default_x(x_ob)
 
-        for i in range(num_rounds):
+        for i in range(round, num_rounds):
             print("Round: ", i)
             theta, x = simulate_for_sbi(simulator, proposal, num_simulations=num_simulations, simulation_batch_size=32)
             density_estimator = inference.append_simulations(theta, x, proposal=proposal).train(show_train_summary=True, training_batch_size=6,
-                                                                                                num_atoms=6, discard_prior_samples=True)
+                                                                                                num_atoms=6, discard_prior_samples=True, max_num_epochs=4)
             sample_with_mcmc = False  # True if i < 2 else False
             posterior = inference.build_posterior(density_estimator, sample_with_mcmc=sample_with_mcmc,
                                                   rejection_sampling_parameters={'max_sampling_batch_size': 50})
+
             self.posteriors.append(posterior)
-            self.save_posterior(posterior, f'tumor_surrogate_pytorch/neural_inference/posteriors/round_{i}.pkl')
+            self.save_state(posterior, i, num_simulations)
 
             proposal = posterior.set_default_x(x_ob)
-            plot_probabilities_2(ranges, gts, proposal, device, i)
+            self.plot_probabilities(proposal, i)
             tumor_density = self.bayesian_inference(1000, proposal)
             img = tumor_density[0:1,:,:,32]
             img.clamp_(min=img.min(), max=img.max())
@@ -153,11 +156,11 @@ if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
     simulator = Simulator()
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-    npe = NPE(simulator=simulator, device=device, log_path='tumor_surrogate_pytorch/logs/', run_name=args.run_name)
+    npe = NPE(simulator=simulator, device=device, log_path='tumor_surrogate_pytorch/neural_inference/logs/', run_name=args.run_name,
+              gts= [2.30e-04, 1.94e-02, 0.75, 4.37e-01, 5.36e-01, 4.91e-01, 0.7, 0.25],
+              ranges=[[0.0001,0.0008], [0.0001,0.03], [0,1], [0.4,0.6], [0.4,0.6], [0.4,0.6], [0.6,0.8], [0.05, 0.6]])
     x_ob = np.load('tumor_surrogate_pytorch/neural_inference/x_obs_test.npz')
     x_ob = x_ob['x_025'] + x_ob['x_07']
     x_ob = x_ob.flatten()
     x_ob = torch.tensor(x_ob, device=device)
-    posterior = npe.forward(x_ob=x_ob, num_rounds=args.rounds, num_simulations=args.num_simulations,
-                            ranges=[[0.0001,0.0008], [0.0001,0.03], [0,1], [0.4,0.6], [0.4,0.6], [0.4,0.6], [0.6,0.8], [0.05, 0.6]],
-                            gts= [2.30e-04, 1.94e-02, 0.75, 4.37e-01, 5.36e-01, 4.91e-01, 0.7, 0.25])
+    posterior = npe.forward(x_ob=x_ob, num_rounds=args.rounds, num_simulations=args.num_simulations, start_round=args.start_round)
