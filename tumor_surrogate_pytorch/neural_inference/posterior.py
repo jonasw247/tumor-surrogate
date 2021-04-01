@@ -3,6 +3,7 @@ import numpy as np
 import os
 import torch
 import torchvision
+import pickle
 from sbi import utils
 from sbi.analysis import eval_conditional_density
 from sbi.inference import simulate_for_sbi, prepare_for_sbi, APT
@@ -51,13 +52,23 @@ def plot_probabilities_2(ranges, gts, posterior, device, round):
         plt.close()
 
 class NPE:
-    def __init__(self, simulator, device, log_path):
+    def __init__(self, simulator, device, log_path, posterior_path=None):
         self.device = device
         self.prior = utils.BoxUniform(low=torch.tensor([0.0001, 0.0001, 0, 0.4, 0.4, 0.4, 0.6, 0.05], device=device),
                                       high=torch.tensor([0.0008, 0.03, 1, 0.6, 0.6, 0.6, 0.8, 0.6], device=device))
+        self.posterior_path = posterior_path
         self.simulator = simulator
         self.posteriors = []
         self.writer = SummaryWriter(log_dir=log_path)
+
+    def save_posterior(self, posterior, path):
+        with open(path, "wb") as handle:
+            pickle.dump(posterior, handle)
+
+    def load_posterior(self, path):
+        with open(path, "rb") as handle:
+            posterior = pickle.load(handle)
+        return posterior
 
     def bayesian_inference(self, num_samples, proposal):
         thetas = proposal.sample((num_samples,))
@@ -76,15 +87,20 @@ class NPE:
         inference = APT(prior=self.prior, device='gpu', density_estimator=neural_posterior)
         simulator, prior = prepare_for_sbi(self.simulator.predict_tumor_label_map, self.prior)
         proposal = prior
+        if self.posterior_path is not None:
+            proposal = self.load_posterior(self.posterior_path).set_default_x(x_ob)
+
         for i in range(num_rounds):
             print("Round: ", i)
             theta, x = simulate_for_sbi(simulator, proposal, num_simulations=num_simulations, simulation_batch_size=32)
             density_estimator = inference.append_simulations(theta, x, proposal=proposal).train(show_train_summary=True, training_batch_size=6,
-                                                                                                num_atoms=6, discard_prior_samples=True)
+                                                                                                num_atoms=6, discard_prior_samples=True, max_num_epochs=3)
             sample_with_mcmc = False  # True if i < 2 else False
             posterior = inference.build_posterior(density_estimator, sample_with_mcmc=sample_with_mcmc,
                                                   rejection_sampling_parameters={'max_sampling_batch_size': 50})
             self.posteriors.append(posterior)
+            self.save_posterior(posterior, f'tumor_surrogate_pytorch/neural_inference/posteriors/round_{i}.pkl')
+
             proposal = posterior.set_default_x(x_ob)
             plot_probabilities_2(ranges, gts, proposal, device, i)
             tumor_density = self.bayesian_inference(1000, proposal)
