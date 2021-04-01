@@ -16,6 +16,22 @@ from tumor_surrogate_pytorch.neural_inference.simulator import Simulator
 import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
 
+import argparse
+
+def add_argument_group(name):
+    arg = parser.add_argument_group(name)
+    arg_lists.append(arg)
+    return arg
+
+arg_lists = []
+parser = argparse.ArgumentParser()
+parser.add_argument('--rounds', type=int, default=10)
+parser.add_argument('--num_simulations', type=int, default=5000)
+
+parser.add_argument('--run_name', type=str, default='debug')
+parser.add_argument('--gpu', type=str, default='0')
+
+
 
 def print_gpu_utilisation():
     gpu = GPUtil.getGPUs()[1]
@@ -55,14 +71,14 @@ def plot_probabilities_2(ranges, gts, posterior, device, round):
         plt.close()
 
 class NPE:
-    def __init__(self, simulator, device, log_path, posterior_path=None):
+    def __init__(self, simulator, device, log_path, run_name, posterior_path=None):
         self.device = device
         self.prior = utils.BoxUniform(low=torch.tensor([0.0001, 0.0001, 0, 0.4, 0.4, 0.4, 0.6, 0.05], device=device),
                                       high=torch.tensor([0.0008, 0.03, 1, 0.6, 0.6, 0.6, 0.8, 0.6], device=device))
         self.posterior_path = posterior_path
         self.simulator = simulator
         self.posteriors = []
-        self.writer = SummaryWriter(log_dir=log_path)
+        self.writer = SummaryWriter(log_dir=log_path+run_name)
 
     def save_posterior(self, posterior, path):
         with open(path, "wb") as handle:
@@ -133,14 +149,15 @@ class NPE:
 
 
 if __name__ == '__main__':
-    os.environ['CUDA_VISIBLE_DEVICES'] = "4"
+    args = parser.parse_args()
+    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
     simulator = Simulator()
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-    npe = NPE(simulator=simulator, device=device, log_path='tumor_surrogate_pytorch/logs/run1')
+    npe = NPE(simulator=simulator, device=device, log_path='tumor_surrogate_pytorch/logs/', run_name=args.run_name)
     x_ob = np.load('tumor_surrogate_pytorch/neural_inference/x_obs_test.npz')
     x_ob = x_ob['x_025'] + x_ob['x_07']
     x_ob = x_ob.flatten()
     x_ob = torch.tensor(x_ob, device=device)
-    posterior = npe.forward(x_ob=x_ob, num_rounds=10, num_simulations=5000,
+    posterior = npe.forward(x_ob=x_ob, num_rounds=args.rounds, num_simulations=args.num_simulations,
                             ranges=[[0.0001,0.0008], [0.0001,0.03], [0,1], [0.4,0.6], [0.4,0.6], [0.4,0.6], [0.6,0.8], [0.05, 0.6]],
                             gts= [2.30e-04, 1.94e-02, 0.75, 4.37e-01, 5.36e-01, 4.91e-01, 0.7, 0.25])
