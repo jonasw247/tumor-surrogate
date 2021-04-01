@@ -6,6 +6,7 @@ import torchvision
 from sbi import utils
 from sbi.analysis import eval_conditional_density
 from sbi.inference import simulate_for_sbi, prepare_for_sbi, APT
+from tumor_surrogate_pytorch.neural_inference.create_observation import get_gt_img
 
 from tumor_surrogate_pytorch.neural_inference.embedding_net import ConvNet
 from tumor_surrogate_pytorch.neural_inference.simulator import Simulator
@@ -76,6 +77,8 @@ class NPE:
         inference = APT(prior=self.prior, device='gpu', density_estimator=neural_posterior)
         simulator, prior = prepare_for_sbi(self.simulator.predict_tumor_label_map, self.prior)
         proposal = prior
+        gt = get_gt_img(sample_name = '10_13_16')
+        self.writer.add_image('ground truth', gt[0:1, :, :, 32], global_step=0)
         for i in range(num_rounds):
             print("Round: ", i)
             theta, x = simulate_for_sbi(simulator, proposal, num_simulations=num_simulations, simulation_batch_size=32)
@@ -88,7 +91,10 @@ class NPE:
             proposal = posterior.set_default_x(x_ob)
             plot_probabilities_2(ranges, gts, proposal, device, i)
             tumor_density = self.bayesian_inference(1000, proposal)
-            self.writer.add_image('bayesian plot', tumor_density[0:1,:,:,32], global_step=i)
+            img = tumor_density[0:1,:,:,32]
+            img.clamp_(min=img.min(), max=img.max())
+            img.sub_(img.min()).div_(max(img.max() - img.min(), 1e-5))
+            self.writer.add_image('bayesian plot', img, global_step=i)
             #map_estimate = proposal.map(num_init_samples=50, num_to_optimize=25, show_progress_bars=False)
             #for j in range(8):
             #    self.writer.add_scalar(f'parameter {j+1} map', map_estimate[j], global_step=i)
