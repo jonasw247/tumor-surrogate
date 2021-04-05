@@ -17,6 +17,8 @@ import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
 
 import argparse
+import warnings
+warnings.filterwarnings("ignore")
 
 def add_argument_group(name):
     arg = parser.add_argument_group(name)
@@ -32,11 +34,42 @@ parser.add_argument('--start_round', type=int, default=None)
 parser.add_argument('--run_name', type=str, default='debug')
 parser.add_argument('--gpu', type=str, default='0')
 
-
+param_to_name = {
+    0: 'D',
+    1: '\u03C1',
+    2: 'T',
+    3: 'x',
+    4: 'y',
+    5: 'z',
+    6: 'u_1',
+    7: 'u_2'
+}
 
 def print_gpu_utilisation():
     gpu = GPUtil.getGPUs()[1]
     print(f'{gpu.memoryUsed} MB allocated\n')
+
+def plot_probabilities(posterior, ranges, gts):
+    steps = 100
+    fig, axs = plt.subplots(2, 4, sharey=True, tight_layout=True, figsize=(15,5))
+    for i, r in enumerate(ranges):
+        x = np.linspace(r[0] + 1e-32, r[1] - 1e-32, steps)
+        probs = eval_conditional_density(posterior, torch.tensor(gts, device=torch.device('cuda')),
+                                         torch.tensor(ranges, device=torch.device('cuda')), dim1=i, dim2=i, resolution=steps)
+        if i == 2:
+            x = x * 20 + 1
+            axs[i//4, i % 4].axvline(x=gts[i] * 20 + 1, linestyle='dotted', color='red')
+        else:
+            axs[i//4, i % 4].axvline(x=gts[i], linestyle='dotted', color='red')
+
+
+        axs[i//4, i % 4].locator_params(axis="x", nbins=5)
+        axs[i//4, i % 4].plot(x, probs.cpu().numpy())
+        axs[i//4, i % 4].set_title(f"Parameter {param_to_name[i]}")
+    #plt.savefig(f'tumor_surrogate_pytorch/neural_inference/output/{self.run_name}/plots/round_{round}_paramerter_{i}.png')
+    plt.show()
+    plt.clf()
+    plt.close()
 
 
 class NPE:
@@ -130,7 +163,7 @@ class NPE:
             print("Round: ", i)
             theta, x = simulate_for_sbi(simulator, proposal, num_simulations=num_simulations, simulation_batch_size=32)
             density_estimator = inference.append_simulations(theta, x, proposal=proposal).train(show_train_summary=True, training_batch_size=6,
-                                                                                                num_atoms=6, discard_prior_samples=True, max_num_epochs=4)
+                                                                                                num_atoms=6, discard_prior_samples=True)
             sample_with_mcmc = False  # True if i < 2 else False
             posterior = inference.build_posterior(density_estimator, sample_with_mcmc=sample_with_mcmc,
                                                   rejection_sampling_parameters={'max_sampling_batch_size': 50})
@@ -154,13 +187,60 @@ class NPE:
 if __name__ == '__main__':
     args = parser.parse_args()
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
+
     simulator = Simulator()
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     npe = NPE(simulator=simulator, device=device, log_path='tumor_surrogate_pytorch/neural_inference/logs/', run_name=args.run_name,
               gts= [2.30e-04, 1.94e-02, 0.75, 4.37e-01, 5.36e-01, 4.91e-01, 0.7, 0.25],
               ranges=[[0.0001,0.0008], [0.0001,0.03], [0,1], [0.4,0.6], [0.4,0.6], [0.4,0.6], [0.6,0.8], [0.05, 0.6]])
+
     x_ob = np.load('tumor_surrogate_pytorch/neural_inference/x_obs_test.npz')
     x_ob = x_ob['x_025'] + x_ob['x_07']
+    x_ob_img = np.copy(x_ob)
     x_ob = x_ob.flatten()
-    x_ob = torch.tensor(x_ob, device=device)
+    x_ob = torch.tensor(x_ob, device=torch.device('cuda'))
     posterior = npe.forward(x_ob=x_ob, num_rounds=args.rounds, num_simulations=args.num_simulations, start_round=args.start_round)
+
+    '''
+    with open('tumor_surrogate_pytorch/neural_inference/output/run1/posterior/round_4.pkl', "rb") as handle:
+        posterior = pickle.load(handle)
+        proposal = posterior.set_default_x(x_ob)
+        simulator = Simulator()
+        gt = get_gt_img(sample_name='10_13_16')
+
+        map_estimate = proposal.map(num_init_samples=50, num_to_optimize=25, show_progress_bars=True)
+        tumor_density = simulator.predict_tumor_density(map_estimate)
+        img = tumor_density[0, :, :, 32]
+        img.clamp_(min=img.min(), max=img.max())
+        img.sub_(img.min()).div_(max(img.max() - img.min(), 1e-5))
+        #img = img.permute(1,2,0).cpu().numpy()
+
+        thresholded_u1 = np.copy(img)
+        thresholded_u2 = np.copy(img)
+        thresholded_u1[thresholded_u1 >= map_estimate[6].cpu().numpy()] = 1
+        thresholded_u1[thresholded_u1 < map_estimate[6].cpu().numpy()] = 0
+
+        thresholded_u2[thresholded_u2 >= map_estimate[7].cpu().numpy()] = 1
+        thresholded_u2[thresholded_u2 < map_estimate[7].cpu().numpy()] = 0
+
+        fig, axs = plt.subplots(2, 3, sharey=True, tight_layout=True)
+        axs[0,0].imshow(gt[0, :, :, 32])
+        axs[0,1].imshow(img)
+        axs[0,2].imshow(np.abs(gt[0, :, :, 32]-img), cmap='jet', vmin=0, vmax=1)
+
+        thresholded_u1_gt = np.copy(gt[0, :, :, 32])
+        thresholded_u2_gt = np.copy(gt[0, :, :, 32])
+        thresholded_u1_gt[thresholded_u1_gt >= 0.7] = 1
+        thresholded_u1_gt[thresholded_u1_gt < 0.7] = 0
+
+        thresholded_u2_gt[thresholded_u2_gt >= 0.25] = 1
+        thresholded_u2_gt[thresholded_u2_gt < 0.25] = 0
+
+        axs[1,0].imshow(thresholded_u1_gt+thresholded_u2_gt)
+        axs[1,1].imshow(thresholded_u1+thresholded_u2)
+        axs[1,2].imshow(np.abs((thresholded_u1_gt+thresholded_u2_gt)-(thresholded_u1+thresholded_u2)), cmap='jet', vmin=0, vmax=1)
+
+        plt.savefig('map_estimate_run1_round4-2.png')
+
+        '''
+
