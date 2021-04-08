@@ -66,8 +66,8 @@ def plot_probabilities(posterior, ranges, gts):
         axs[i//4, i % 4].locator_params(axis="x", nbins=5)
         axs[i//4, i % 4].plot(x, probs.cpu().numpy())
         axs[i//4, i % 4].set_title(f"Parameter {param_to_name[i]}")
-    #plt.savefig(f'tumor_surrogate_pytorch/neural_inference/output/{self.run_name}/plots/round_{round}_paramerter_{i}.png')
-    plt.show()
+    plt.savefig(f'tumor_surrogate_pytorch/neural_inference/output/run2_noreuse/plots/round_2_parameters.png')
+    #plt.show()
     plt.clf()
     plt.close()
 
@@ -201,7 +201,7 @@ if __name__ == '__main__':
     x_ob = torch.tensor(x_ob, device=torch.device('cuda'))
     posterior = npe.forward(x_ob=x_ob, num_rounds=args.rounds, num_simulations=args.num_simulations, start_round=args.start_round)
 
-    '''
+    """
     with open('tumor_surrogate_pytorch/neural_inference/output/run1/posterior/round_4.pkl', "rb") as handle:
         posterior = pickle.load(handle)
         proposal = posterior.set_default_x(x_ob)
@@ -209,7 +209,7 @@ if __name__ == '__main__':
         gt = get_gt_img(sample_name='10_13_16')
 
         map_estimate = proposal.map(num_init_samples=50, num_to_optimize=25, show_progress_bars=True)
-        tumor_density = simulator.predict_tumor_density(map_estimate)
+        tumor_density = simulator.predict_tumor_density(map_estimate, brain_id='10_13_16')
         img = tumor_density[0, :, :, 32]
         img.clamp_(min=img.min(), max=img.max())
         img.sub_(img.min()).div_(max(img.max() - img.min(), 1e-5))
@@ -240,7 +240,5 @@ if __name__ == '__main__':
         axs[1,1].imshow(thresholded_u1+thresholded_u2)
         axs[1,2].imshow(np.abs((thresholded_u1_gt+thresholded_u2_gt)-(thresholded_u1+thresholded_u2)), cmap='jet', vmin=0, vmax=1)
 
-        plt.savefig('map_estimate_run1_round4-2.png')
-
-        '''
-
+        plt.savefig('map_estimate_run1_round6.png')
+    """

@@ -15,6 +15,16 @@ def plot_probabilities(ranges, gts):
         plt.plot(x, probs[:,0])
         plt.show()
 
+param_to_name = {
+    0: 'D',
+    1: '\u03C1',
+    2: 'T',
+    3: 'x',
+    4: 'y',
+    5: 'z',
+    6: 'u_1',
+    7: 'u_2'
+}
 
 if __name__ == '__main__':
     #xmin, xmax = -1, 5
@@ -28,8 +38,9 @@ if __name__ == '__main__':
     #                        gts= [2.30e-04, 1.94e-02, 1.60e+01, 4.37e-01, 5.36e-01, 4.91e-01, 0.7, 0.25])
 
         for param in range(8):
-            fig, axs = plt.subplots(1,7, sharey=True, tight_layout=True, figsize=(30,5))
-            for round in range(7):
+            fig, axs = plt.subplots(1,8, sharey=True, tight_layout=True, figsize=(30,5))
+            plt.title(f'Parameter {param_to_name[param]}')
+            for round in range(8):
                 axs[round].axis('off')
                 axs[round].get_xaxis().set_visible(False)
                 axs[round].get_yaxis().set_visible(False)
