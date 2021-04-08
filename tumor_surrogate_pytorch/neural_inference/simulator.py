@@ -96,7 +96,7 @@ class Simulator():
             output = output.view(output.shape[0], -1)
             return output.cpu()
 
-    def predict_tumor_density(self, parameters):
+    def predict_tumor_density(self, parameters, brain_id=None):
         with torch.no_grad():
             if len(parameters.shape) == 1:
                 parameters = parameters[None]
@@ -116,7 +116,8 @@ class Simulator():
             threshold025 = parameters[:,7]
             anatomy = self.anatomy_dataset.getitem(center_x=center_x,
                                                    center_y=center_y,
-                                                   center_z=center_z)
+                                                   center_z=center_z,
+                                                   brain_id=brain_id)
             # call tumor simulator net and predict density
             anatomy = anatomy.to(self.device)
 
@@ -142,15 +143,25 @@ class BrainAnatomyDataset:
                center_y - 32:center_y + 32,
                center_z - 32:center_z + 32]
 
-    def getitem(self, center_x, center_y, center_z):
-        batch_size = center_x.shape[0]
-        idxes = np.random.randint(low=0, high=10, size=batch_size)
-        data = torch.empty((batch_size, 3, 64, 64, 64), device=self.device)
-        for i, idx in enumerate(idxes):
-            cropped_data = self.crop(self.brains[idx], center_x[i], center_y[i], center_z[i])
-            data[i] = cropped_data
+    def getitem(self, center_x, center_y, center_z, brain_id=None):
 
-        return data
+        if brain_id:
+            data = torch.empty((1, 3, 64, 64, 64), device=self.device)
+            data_path = f'/mnt/Drive2/ivan/deept/data/valid/{brain_id}.npz'
+            brain = np.load(data_path)
+            brain = torch.from_numpy(brain['x'][:, :, :, 1:]).permute((3, 0, 1, 2))
+            data[0] = self.crop(brain, center_x[0], center_y[0], center_z[0])
+            return data
+
+        else:
+            batch_size = center_x.shape[0]
+            idxes = np.random.randint(low=0, high=10, size=batch_size)
+            data = torch.empty((batch_size, 3, 64, 64, 64), device=self.device)
+            for i, idx in enumerate(idxes):
+                cropped_data = self.crop(self.brains[idx], center_x[i], center_y[i], center_z[i])
+                data[i] = cropped_data
+
+            return data
 
 
 if __name__ == '__main__':
