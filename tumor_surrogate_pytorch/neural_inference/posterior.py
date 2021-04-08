@@ -32,11 +32,42 @@ parser.add_argument('--start_round', type=int, default=None)
 parser.add_argument('--run_name', type=str, default='debug')
 parser.add_argument('--gpu', type=str, default='0')
 
-
+param_to_name = {
+    0: 'D',
+    1: '\u03C1',
+    2: 'T',
+    3: 'x',
+    4: 'y',
+    5: 'z',
+    6: 'u_1',
+    7: 'u_2'
+}
 
 def print_gpu_utilisation():
     gpu = GPUtil.getGPUs()[1]
     print(f'{gpu.memoryUsed} MB allocated\n')
+
+def plot_probabilities(posterior, ranges, gts):
+    steps = 100
+    fig, axs = plt.subplots(2, 4, sharey=True, tight_layout=True, figsize=(15,5))
+    for i, r in enumerate(ranges):
+        x = np.linspace(r[0] + 1e-32, r[1] - 1e-32, steps)
+        probs = eval_conditional_density(posterior, torch.tensor(gts, device=torch.device('cuda')),
+                                         torch.tensor(ranges, device=torch.device('cuda')), dim1=i, dim2=i, resolution=steps)
+        if i == 2:
+            x = x * 20 + 1
+            axs[i//4, i % 4].axvline(x=gts[i] * 20 + 1, linestyle='dotted', color='red')
+        else:
+            axs[i//4, i % 4].axvline(x=gts[i], linestyle='dotted', color='red')
+
+
+        axs[i//4, i % 4].locator_params(axis="x", nbins=5)
+        axs[i//4, i % 4].plot(x, probs.cpu().numpy())
+        axs[i//4, i % 4].set_title(f"Parameter {param_to_name[i]}")
+    #plt.savefig(f'tumor_surrogate_pytorch/neural_inference/output/{self.run_name}/plots/round_{round}_paramerter_{i}.png')
+    plt.show()
+    plt.clf()
+    plt.close()
 
 
 class NPE:
