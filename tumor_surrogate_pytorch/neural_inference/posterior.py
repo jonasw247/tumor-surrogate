@@ -145,8 +145,8 @@ class NPE:
 
     def forward(self, x_ob, num_rounds, num_simulations, start_round=None):
         print("Starting forward")
-        neural_posterior = utils.posterior_nn(model='maf',
-                                              embedding_net=ConvNet(device=self.device))
+        neural_posterior = utils.posterior_nn(model='mdn',
+                                              embedding_net=ConvNet(device=self.device), z_score_x=False)
         inference = APT(prior=self.prior, device='gpu', density_estimator=neural_posterior)
         simulator, prior = prepare_for_sbi(self.simulator.predict_tumor_label_map, self.prior)
         proposal = prior
@@ -162,8 +162,8 @@ class NPE:
         for i in range(round, num_rounds):
             print("Round: ", i)
             theta, x = simulate_for_sbi(simulator, proposal, num_simulations=num_simulations, simulation_batch_size=32)
-            density_estimator = inference.append_simulations(theta, x, proposal=proposal).train(show_train_summary=True, training_batch_size=6,
-                                                                                                num_atoms=6, discard_prior_samples=True)
+            density_estimator = inference.append_simulations(theta, x, proposal=proposal).train(show_train_summary=True, training_batch_size=40,
+                                                                                                discard_prior_samples=True)
             sample_with_mcmc = False  # True if i < 2 else False
             posterior = inference.build_posterior(density_estimator, sample_with_mcmc=sample_with_mcmc,
                                                   rejection_sampling_parameters={'max_sampling_batch_size': 50})
