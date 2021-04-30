@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import GPUtil
+import dill as dill
 import numpy as np
 import os
 import torch
@@ -85,7 +86,17 @@ class NPE:
         self.ranges = ranges
         Path(f'tumor_surrogate_pytorch/neural_inference/output/{run_name}/state').mkdir(parents=True, exist_ok=True)
         Path(f'tumor_surrogate_pytorch/neural_inference/output/{run_name}/posterior').mkdir(parents=True, exist_ok=True)
+        Path(f'tumor_surrogate_pytorch/neural_inference/output/{run_name}/inference').mkdir(parents=True, exist_ok=True)
         Path(f'tumor_surrogate_pytorch/neural_inference/output/{run_name}/plots').mkdir(parents=True, exist_ok=True)
+
+    def save_inference(self, inference, path):
+        with open(path, "wb") as handle:
+            dill.dump(inference, handle)
+
+    def load_inference(self, path):
+        with open(path, "rb") as handle:
+            inference = dill.load(handle)
+        return inference
 
     def save_posterior(self, posterior, path):
         with open(path, "wb") as handle:
@@ -96,14 +107,17 @@ class NPE:
             posterior = pickle.load(handle)
         return posterior
 
-    def save_state(self, posterior, round, num_simulations):
+    def save_state(self, inference, posterior, round, num_simulations):
+        inference_path = f'tumor_surrogate_pytorch/neural_inference/output/{self.run_name}/inference/round_{round}.pkl'
         posterior_path = f'tumor_surrogate_pytorch/neural_inference/output/{self.run_name}/posterior/round_{round}.pkl'
         save_dict = {
             'round': round,
             'num_simulations': num_simulations,
+            'inference_path': f'tumor_surrogate_pytorch/neural_inference/output/{self.run_name}/inference/round_{round}.pkl',
             'posterior_path': f'tumor_surrogate_pytorch/neural_inference/output/{self.run_name}/posterior/round_{round}.pkl'
         }
-        self.save_posterior(posterior,posterior_path)
+        self.save_inference(inference,inference_path)
+        self.save_posterior(posterior, posterior_path)
         torch.save(save_dict, f'tumor_surrogate_pytorch/neural_inference/output/{self.run_name}/state/round_{round}')
 
     def load_state(self, round):
@@ -111,10 +125,16 @@ class NPE:
         load_dict = torch.load(state_path)
         round = load_dict['round']+1
         num_simulations = load_dict['num_simulations']
+        inference_path = load_dict['inference_path']
+        inference = self.load_inference(inference_path)
+        inference._summary_writer = inference._default_summary_writer()
+        print("Loading inference from: ", inference_path)
+
         posterior_path = load_dict['posterior_path']
         posterior = self.load_posterior(posterior_path)
         print("Loading posterior from: ", posterior_path)
-        return posterior, round, num_simulations
+
+        return inference, posterior, round, num_simulations
 
     def plot_probabilities(self, posterior, round):
         steps = 100
@@ -156,20 +176,22 @@ class NPE:
 
         round = 0
         if start_round is not None:
-            posterior, round, num_simulations = self.load_state(start_round)
+            inference, posterior, round, num_simulations = self.load_state(start_round)
             proposal = posterior.set_default_x(x_ob)
 
         for i in range(round, num_rounds):
             print("Round: ", i)
             theta, x = simulate_for_sbi(simulator, proposal, num_simulations=num_simulations, simulation_batch_size=32)
-            density_estimator = inference.append_simulations(theta, x, proposal=proposal).train(show_train_summary=True, training_batch_size=40,
+            #x = torch.load('tumor_surrogate_pytorch/neural_inference/error/x25_04_2021_14_33_35.pt', map_location='cpu')
+            #theta = torch.load('tumor_surrogate_pytorch/neural_inference/error/theta_old25_04_2021_14_33_35.pt', map_location='cpu')
+            density_estimator = inference.append_simulations(theta, x, proposal=proposal).train(show_train_summary=True, training_batch_size=32,
                                                                                                 discard_prior_samples=True)
             sample_with_mcmc = False  # True if i < 2 else False
             posterior = inference.build_posterior(density_estimator, sample_with_mcmc=sample_with_mcmc,
                                                   rejection_sampling_parameters={'max_sampling_batch_size': 50})
 
             self.posteriors.append(posterior)
-            self.save_state(posterior, i, num_simulations)
+            self.save_state(inference, posterior, i, num_simulations)
 
             proposal = posterior.set_default_x(x_ob)
             self.plot_probabilities(proposal, i)
@@ -198,7 +220,7 @@ if __name__ == '__main__':
     x_ob = x_ob['x_025'] + x_ob['x_07']
     x_ob_img = np.copy(x_ob)
     x_ob = x_ob.flatten()
-    x_ob = torch.tensor(x_ob, device=torch.device('cuda'))
+    x_ob = torch.tensor(x_ob, device=device)
     posterior = npe.forward(x_ob=x_ob, num_rounds=args.rounds, num_simulations=args.num_simulations, start_round=args.start_round)
 
     """
