@@ -90,6 +90,10 @@ class NPE:
         Path(f'tumor_surrogate_pytorch/neural_inference/output/{run_name}/plots').mkdir(parents=True, exist_ok=True)
 
     def save_inference(self, inference, path):
+        inference._prior_masks = [None for _ in inference._prior_masks]
+        inference._theta_roundwise= [None for _ in inference._theta_roundwise]
+        inference._x_roundwise = [None for _ in inference._x_roundwise]
+        inference._proposal_roundwise = [None for _ in inference._proposal_roundwise]
         with open(path, "wb") as handle:
             dill.dump(inference, handle)
 
