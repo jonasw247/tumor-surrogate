@@ -145,16 +145,17 @@ class BrainAnatomyDataset:
 
     def getitem(self, center_x, center_y, center_z, brain_id=None):
 
+        batch_size = center_x.shape[0]
         if brain_id:
-            data = torch.empty((1, 3, 64, 64, 64), device=self.device)
+            data = torch.empty((batch_size, 3, 64, 64, 64), device=self.device)
             data_path = f'/mnt/Drive2/ivan/deept/data/valid/{brain_id}.npz'
             brain = np.load(data_path)
             brain = torch.from_numpy(brain['x'][:, :, :, 1:]).permute((3, 0, 1, 2))
-            data[0] = self.crop(brain, center_x[0], center_y[0], center_z[0])
+            for i in range(batch_size):
+                data[i] = self.crop(brain, center_x[i], center_y[i], center_z[i])
             return data
 
         else:
-            batch_size = center_x.shape[0]
             idxes = np.random.randint(low=0, high=10, size=batch_size)
             data = torch.empty((batch_size, 3, 64, 64, 64), device=self.device)
             for i, idx in enumerate(idxes):

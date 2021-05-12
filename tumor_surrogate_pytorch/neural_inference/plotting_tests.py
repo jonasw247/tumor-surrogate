@@ -37,15 +37,15 @@ if __name__ == '__main__':
     #plot_probabilities(ranges=[[0.0001,0.0008], [0.0001,0.03], [0,1], [0.4,0.6], [0.4,0.6], [0.4,0.6], [0.6,0.8], [0.05, 0.6]],
     #                        gts= [2.30e-04, 1.94e-02, 1.60e+01, 4.37e-01, 5.36e-01, 4.91e-01, 0.7, 0.25])
 
-        for param in range(8):
-            fig, axs = plt.subplots(1,8, sharey=True, tight_layout=True, figsize=(30,5))
-            plt.title(f'Parameter {param_to_name[param]}')
-            for round in range(8):
-                axs[round].axis('off')
-                axs[round].get_xaxis().set_visible(False)
-                axs[round].get_yaxis().set_visible(False)
-                img = plt.imread(f'tumor_surrogate_pytorch/neural_inference/output/run1/plots/round_{round}_paramerter_{param}.png')
-                axs[round].imshow(img)
-            #plt.show()
-            plt.savefig(f'development_param_{param}.png')
+    for param in range(8):
+        fig, axs = plt.subplots(1,13, sharey=True, tight_layout=True, figsize=(30,5))
+        plt.title(f'Parameter {param_to_name[param]}')
+        for round in range(13):
+            axs[round].axis('off')
+            axs[round].get_xaxis().set_visible(False)
+            axs[round].get_yaxis().set_visible(False)
+            img = plt.imread(f'tumor_surrogate_pytorch/neural_inference/output/run10_mdn_2components/plots/round_{round}_paramerter_{param}.png')
+            axs[round].imshow(img)
+        #plt.show()
+        plt.savefig(f'tumor_surrogate_pytorch/neural_inference/output/run10_mdn_2components/development/development_param_{param}.png')
 

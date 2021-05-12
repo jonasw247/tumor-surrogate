@@ -162,14 +162,21 @@ class NPE:
         tumor_density = torch.zeros(1,64,64,64)
         for i in range(thetas.shape[0]//32+1):
             curr_theta = thetas[i*32:(i+1)*32]
-            tumor_density += self.simulator.predict_tumor_density(curr_theta)
+            tumor_density += self.simulator.predict_tumor_density(curr_theta, brain_id='10_13_16')
 
         tumor_density /= num_samples
         return tumor_density
 
+    def bayesian_inference_pre(self, num_samples, proposal):
+        thetas = proposal.sample((num_samples,))
+        avg_theta = torch.mean(thetas, dim=0)
+        tumor_density = self.simulator.predict_tumor_density(avg_theta, brain_id='10_13_16')
+
+        return tumor_density, avg_theta
+
     def forward(self, x_ob, num_rounds, num_simulations, start_round=None):
         print("Starting forward")
-        neural_posterior = utils.posterior_nn(model='mdn',
+        neural_posterior = utils.posterior_nn(model='mdn', num_components=1,
                                               embedding_net=ConvNet(device=self.device), z_score_x=False)
         inference = APT(prior=self.prior, device='gpu', density_estimator=neural_posterior)
         simulator, prior = prepare_for_sbi(self.simulator.predict_tumor_label_map, self.prior)
@@ -199,11 +206,11 @@ class NPE:
 
             proposal = posterior.set_default_x(x_ob)
             self.plot_probabilities(proposal, i)
-            tumor_density = self.bayesian_inference(1000, proposal)
-            img = tumor_density[0:1,:,:,32]
-            img.clamp_(min=img.min(), max=img.max())
-            img.sub_(img.min()).div_(max(img.max() - img.min(), 1e-5))
-            self.writer.add_image('bayesian plot', img, global_step=i)
+            # tumor_density = self.bayesian_inference(1000, proposal)
+            # img = tumor_density[0:1,:,:,32]
+            # img.clamp_(min=img.min(), max=img.max())
+            # img.sub_(img.min()).div_(max(img.max() - img.min(), 1e-5))
+            # self.writer.add_image('bayesian plot', img, global_step=i)
             #map_estimate = proposal.map(num_init_samples=50, num_to_optimize=25, show_progress_bars=False)
             #for j in range(8):
             #    self.writer.add_scalar(f'parameter {j+1} map', map_estimate[j], global_step=i)
@@ -227,27 +234,30 @@ if __name__ == '__main__':
     x_ob = torch.tensor(x_ob, device=device)
     posterior = npe.forward(x_ob=x_ob, num_rounds=args.rounds, num_simulations=args.num_simulations, start_round=args.start_round)
 
-    """
-    with open('tumor_surrogate_pytorch/neural_inference/output/run1/posterior/round_4.pkl', "rb") as handle:
+
+    '''    
+    with open('tumor_surrogate_pytorch/neural_inference/output/run11_mdn_1component/posterior/round_18.pkl', "rb") as handle:
         posterior = pickle.load(handle)
         proposal = posterior.set_default_x(x_ob)
         simulator = Simulator()
         gt = get_gt_img(sample_name='10_13_16')
 
-        map_estimate = proposal.map(num_init_samples=50, num_to_optimize=25, show_progress_bars=True)
-        tumor_density = simulator.predict_tumor_density(map_estimate, brain_id='10_13_16')
-        img = tumor_density[0, :, :, 32]
+        #map_estimate = proposal.map(num_init_samples=50, num_to_optimize=25, show_progress_bars=True)
+        #tumor_density = simulator.predict_tumor_density(map_estimate, brain_id='10_13_16')
+        #tumor_density = npe.bayesian_inference(num_samples=1000, proposal=proposal)
+        tumor_density_pre, avg_theta = npe.bayesian_inference_pre(num_samples=1000, proposal=proposal)
+        img = tumor_density_pre[0, :, :, 32]
         img.clamp_(min=img.min(), max=img.max())
         img.sub_(img.min()).div_(max(img.max() - img.min(), 1e-5))
         #img = img.permute(1,2,0).cpu().numpy()
 
         thresholded_u1 = np.copy(img)
         thresholded_u2 = np.copy(img)
-        thresholded_u1[thresholded_u1 >= map_estimate[6].cpu().numpy()] = 1
-        thresholded_u1[thresholded_u1 < map_estimate[6].cpu().numpy()] = 0
+        thresholded_u1[thresholded_u1 >= avg_theta[6].cpu().numpy()] = 1
+        thresholded_u1[thresholded_u1 < avg_theta[6].cpu().numpy()] = 0
 
-        thresholded_u2[thresholded_u2 >= map_estimate[7].cpu().numpy()] = 1
-        thresholded_u2[thresholded_u2 < map_estimate[7].cpu().numpy()] = 0
+        thresholded_u2[thresholded_u2 >= avg_theta[7].cpu().numpy()] = 1
+        thresholded_u2[thresholded_u2 < avg_theta[7].cpu().numpy()] = 0
 
         fig, axs = plt.subplots(2, 3, sharey=True, tight_layout=True)
         axs[0,0].imshow(gt[0, :, :, 32])
@@ -266,5 +276,6 @@ if __name__ == '__main__':
         axs[1,1].imshow(thresholded_u1+thresholded_u2)
         axs[1,2].imshow(np.abs((thresholded_u1_gt+thresholded_u2_gt)-(thresholded_u1+thresholded_u2)), cmap='jet', vmin=0, vmax=1)
 
-        plt.savefig('map_estimate_run1_round6.png')
-    """
+        plt.savefig('bayesian_inference_pre_5000_run11_mdn_1component_round18.png')
+        '''
+    
