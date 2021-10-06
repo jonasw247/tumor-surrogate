@@ -10,8 +10,8 @@ def add_argument_group(name):
 
 train_arg = add_argument_group('Training')
 train_arg.add_argument('--max_epoch', type=int, default=60)
-train_arg.add_argument('--train_batch_size', type=int, default=8)
-train_arg.add_argument('--val_batch_size', type=int, default=8)
+train_arg.add_argument('--train_batch_size', type=int, default=3)
+train_arg.add_argument('--val_batch_size', type=int, default=3)
 train_arg.add_argument('--lr_max', type=float, default=0.0001)
 train_arg.add_argument('--lr_min', type=float, default=0.0000025)
 train_arg.add_argument('--optimizer', type=str, default='adam')
@@ -20,13 +20,13 @@ train_arg.add_argument('--beta2', type=float, default=0.999)
 train_arg.add_argument('--weight_decay', type=float, default=4e-20)
 train_arg.add_argument('--save_path', type=str, default='tumor_surrogate_pytorch/saved_model/')
 train_arg.add_argument('--log_path', type=str, default='tumor_surrogate_pytorch/runs/')
-train_arg.add_argument('--run_name', type=str, default='model')
-train_arg.add_argument('--gpu_id', type=str, default='4')
+train_arg.add_argument('--run_name', type=str, default='retrain_model2')
+train_arg.add_argument('--gpu_id', type=str, default='1')
 train_arg.add_argument('--resume', action='store_true')
 
 
 train_arg = add_argument_group('Data')
-train_arg.add_argument('--data_path', type=str, default='/mnt/Drive2/ivan/deept/data/')
+train_arg.add_argument('--data_path', type=str, default='/home/marc_chan/data')
 
 
 

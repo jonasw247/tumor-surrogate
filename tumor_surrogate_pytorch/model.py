@@ -137,7 +137,7 @@ class TumorSurrogate(nn.Module):
 
     def forward(self, x, parameters):
         # First Conv
-        x = self.encoder_blocks[0](x)
+        x = self.encoder_blocks[0](x.clone())
         # First Block
         x, lat1 = self.encoder_blocks[1](x)
         # Second Block

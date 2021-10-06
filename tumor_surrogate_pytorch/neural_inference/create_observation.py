@@ -11,7 +11,7 @@ def crop(x, center_x, center_y, center_z):
            center_z - 32:center_z + 32, :]
 
 def get_gt_img(sample_name = '10_13_16'):
-    data_path = f'/mnt/Drive2/ivan/deept/data/valid/{sample_name}.npz'
+    data_path = f'/home/marc_chan/data/valid/{sample_name}.npz'
     data = np.load(data_path)
     parameters = data['y']
     output = data['x'][:, :, :, 0:1]
@@ -23,7 +23,7 @@ if __name__ == '__main__':
     # dice02: 0.9830, dice04: 0.9821, dice08: 0.9773, mae_wm: 0.0133162, mae_gm: 0.012050265, mae_csf: 0.00082050124
     # parameters: [2.30e-04 1.94e-02 1.60e+01 4.37e-01 5.36e-01 4.91e-01]
     sample_name = '10_13_16'
-    data_path = f'/mnt/Drive2/ivan/deept/data/valid/{sample_name}.npz'
+    data_path = f'/home/marc_chan/data/valid/{sample_name}.npz'
     data = np.load(data_path)
     x = data['x'][:, :, :, 1:]
     parameters = data['y']

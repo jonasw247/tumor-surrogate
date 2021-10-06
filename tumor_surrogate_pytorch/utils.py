@@ -69,7 +69,7 @@ def compute_dice_score(u_pred, u_sim, threshold):
 def mean_absolute_error_helper(y_true, y_pred):
     return np.mean(np.abs(y_true - y_pred))
 
-def mean_absolute_error2(ground_truth, output, input):
+def mean_absolute_error(ground_truth, output, input):
 
     input[:, 0][input[:, 0] >= 0.35] = 1
     input[:, 0][input[:, 0] < 0.35] = 0
@@ -141,7 +141,7 @@ def create_hists(model, val_loader, device, save_path):
 
                 input = input.cpu()
                 #mae_wm_value0, mae_gm_value0, mae_csf_value0 = mean_absolute_error(ground_truth=ground_truth, output=output, input=input)
-                mae_wm_value, mae_gm_value, mae_csf_value = mean_absolute_error2(ground_truth=ground_truth, output=output, input=input)
+                mae_wm_value, mae_gm_value, mae_csf_value = mean_absolute_error(ground_truth=ground_truth, output=output, input=input)
 
                 if mae_wm_value is not None:
                     mae_wm.append(mae_wm_value)

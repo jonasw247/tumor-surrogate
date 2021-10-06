@@ -148,7 +148,7 @@ class BrainAnatomyDataset:
         batch_size = center_x.shape[0]
         if brain_id:
             data = torch.empty((batch_size, 3, 64, 64, 64), device=self.device)
-            data_path = f'/mnt/Drive2/ivan/deept/data/valid/{brain_id}.npz'
+            data_path = f'/home/marc_chan/data/data/valid/{brain_id}.npz'
             brain = np.load(data_path)
             brain = torch.from_numpy(brain['x'][:, :, :, 1:]).permute((3, 0, 1, 2))
             for i in range(batch_size):

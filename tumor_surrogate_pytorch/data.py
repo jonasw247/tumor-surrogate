@@ -65,6 +65,7 @@ class TumorDataset(Dataset):
 
 if __name__ == '__main__':
     # path = '/mnt/Drive2/ivan/data/tumor_mparam/v/'
+    # /home/marc_chan/data
     data_dir = '/mnt/Drive2/ivan/deept/data'
     dataset = 'tumor_mparam/v/' #or valid
     dataset = TumorDataset(data_dir, dataset)
