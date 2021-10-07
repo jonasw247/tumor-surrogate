@@ -17,6 +17,8 @@ class Trainer():
         self.device = device
         self.writer = SummaryWriter(log_dir=config.log_path + config.run_name)
         self.save_path = config.save_path + config.run_name
+        Path(config.save_path).mkdir(parents=True, exist_ok=True)
+
         self.global_step = 0
 
     """ learning rate """
@@ -109,14 +111,14 @@ class Trainer():
                 self.writer.flush()
                 if val_dice > best_dice:
                     best_dice = val_dice
-                    torch.save(net.state_dict(), self.save_path + '_best')
+                    torch.save(net.state_dict(), self.save_path + '_best.pt')
                 save_dict = {
                     'epoch': epoch+1,
                     'weight_optimizer': optimizer.state_dict(),
                     'state_dict': net.state_dict(),
                     'best_dice': best_dice
                 }
-                torch.save(save_dict, self.save_path)
+                torch.save(save_dict, self.save_path + '.pt')
 
     def validate(self, net, writer=None, step=0):
         valid_dataset = TumorDataset(data_path=self.config.data_path, dataset='valid/')
