@@ -21,6 +21,9 @@ import argparse
 import warnings
 warnings.filterwarnings("ignore")
 
+import nibabel as nib
+from skimage.transform import resize
+
 def add_argument_group(name):
     arg = parser.add_argument_group(name)
     arg_lists.append(arg)
@@ -162,7 +165,7 @@ class NPE:
         tumor_density = torch.zeros(1,64,64,64)
         for i in range(thetas.shape[0]//32+1):
             curr_theta = thetas[i*32:(i+1)*32]
-            tumor_density += self.simulator.predict_tumor_density(curr_theta, brain_id='10_13_16')
+            tumor_density += self.simulator.predict_tumor_density(curr_theta, brain_id='real') #10_13_16
 
         tumor_density /= num_samples
         return tumor_density
@@ -170,20 +173,21 @@ class NPE:
     def bayesian_inference_pre(self, num_samples, proposal):
         thetas = proposal.sample((num_samples,))
         avg_theta = torch.mean(thetas, dim=0)
-        tumor_density = self.simulator.predict_tumor_density(avg_theta, brain_id='10_13_16')
+        tumor_density = self.simulator.predict_tumor_density(avg_theta, brain_id='real')
 
         return tumor_density, avg_theta
 
     def forward(self, x_ob, num_rounds, num_simulations, start_round=None):
         print("Starting forward")
+        print(self.device)
         neural_posterior = utils.posterior_nn(model='mdn', num_components=1,
                                               embedding_net=ConvNet(device=self.device), z_score_x=False)
         inference = APT(prior=self.prior, device='gpu', density_estimator=neural_posterior)
         simulator, prior = prepare_for_sbi(self.simulator.predict_tumor_label_map, self.prior)
         proposal = prior
 
-        gt = get_gt_img(sample_name = '10_13_16')
-        self.writer.add_image('ground truth', gt[0:1, :, :, 32], global_step=0)
+        #gt = get_gt_img(sample_name = '10_13_16')
+        #self.writer.add_image('ground truth', gt[0:1, :, :, 32], global_step=0)
 
         round = 0
         if start_round is not None:
@@ -192,20 +196,22 @@ class NPE:
 
         for i in range(round, num_rounds):
             print("Round: ", i)
-            theta, x = simulate_for_sbi(simulator, proposal, num_simulations=num_simulations, simulation_batch_size=32)
+            theta, x = simulate_for_sbi(simulator, proposal, num_simulations=num_simulations, simulation_batch_size=8)
             #x = torch.load('tumor_surrogate_pytorch/neural_inference/error/x25_04_2021_14_33_35.pt', map_location='cpu')
             #theta = torch.load('tumor_surrogate_pytorch/neural_inference/error/theta_old25_04_2021_14_33_35.pt', map_location='cpu')
-            density_estimator = inference.append_simulations(theta, x, proposal=proposal).train(show_train_summary=True, training_batch_size=32,
+            density_estimator = inference.append_simulations(theta, x, proposal=proposal).train(show_train_summary=True, training_batch_size=8,
                                                                                                 discard_prior_samples=True)
             sample_with_mcmc = False  # True if i < 2 else False
             posterior = inference.build_posterior(density_estimator, sample_with_mcmc=sample_with_mcmc,
                                                   rejection_sampling_parameters={'max_sampling_batch_size': 50})
+            print("build posterior")
 
             self.posteriors.append(posterior)
             self.save_state(inference, posterior, i, num_simulations)
 
             proposal = posterior.set_default_x(x_ob)
-            self.plot_probabilities(proposal, i)
+            print("set default x")
+            #self.plot_probabilities(proposal, i)
             # tumor_density = self.bayesian_inference(1000, proposal)
             # img = tumor_density[0:1,:,:,32]
             # img.clamp_(min=img.min(), max=img.max())
@@ -217,9 +223,53 @@ class NPE:
         return posterior
 
 
+def load_images_real():
+    tum_t1 = np.zeros((240,240,240))
+    tum_t2 = np.zeros((240,240,240))
+    tum_t1m = np.zeros((240,240,240))
+    tum_t2m = np.zeros((240,240,240))
+    gm = np.zeros((240, 240, 240))
+    wm = np.zeros((240, 240, 240))
+    csf = np.zeros((240, 240, 240))
+
+    tum_t1[:, :, :155] = nib.load("tumor_surrogate_pytorch/neural_inference/rec001_pre/Tum_T1c.nii.gz").get_data()
+    tum_t2[:, :, :155] = nib.load("tumor_surrogate_pytorch/neural_inference/rec001_pre/Tum_FLAIR.nii.gz").get_data()
+    tum_t1m[:, :, :155] = nib.load("tumor_surrogate_pytorch/neural_inference/rec001_pre/T1c.nii.gz").get_data()
+    tum_t2m[:, :, :155] = nib.load("tumor_surrogate_pytorch/neural_inference/rec001_pre/FLAIR.nii.gz").get_data()
+    gm[:, :, :155] = nib.load("tumor_surrogate_pytorch/neural_inference/rec001_pre/GM.nii.gz").get_data()
+    wm[:, :, :155] = nib.load("tumor_surrogate_pytorch/neural_inference/rec001_pre/WM.nii.gz").get_data()
+    csf[:, :, :155] = nib.load("tumor_surrogate_pytorch/neural_inference/rec001_pre/CSF.nii.gz").get_data()
+
+    tum_t1[tum_t1 >= 1] = 1
+
+    # resize
+    tum_t1_resized = resize(tum_t1, (128, 128, 128), order=0)
+    tum_t2_resized = resize(tum_t2, (128, 128, 128), order=0)
+
+    tum_t1m_resized = resize(tum_t1m, (128, 128, 128), order=0)
+    tum_t2m_resized = resize(tum_t2m, (128, 128, 128), order=0)
+
+    gm_resized = resize(gm, (128, 128, 128), order=0)
+    wm_resized = resize(wm, (128, 128, 128), order=0)
+    csf_resized = resize(csf, (128, 128, 128), order=0)
+
+    t1m = tum_t1m_resized[:, :, 32]
+    t2m = tum_t2m_resized[:, :, 32]
+
+    obs = tum_t1_resized + tum_t2_resized
+    obs = tum_t1m_resized[:, :, 32]
+
+    gm = gm[:, :, 32]
+    wm = wm[:, :, 32]
+    csf = csf[:, :, 32]
+
+    return t1m,t2m,obs, gm, wm, csf
+
+
 if __name__ == '__main__':
     args = parser.parse_args()
-    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
+    os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+    mode = 'real'
 
     simulator = Simulator()
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -227,20 +277,24 @@ if __name__ == '__main__':
               gts= [2.30e-04, 1.94e-02, 0.75, 4.37e-01, 5.36e-01, 4.91e-01, 0.7, 0.25],
               ranges=[[0.0001,0.0008], [0.0001,0.03], [0,1], [0.4,0.6], [0.4,0.6], [0.4,0.6], [0.6,0.8], [0.05, 0.6]])
 
-    x_ob = np.load('tumor_surrogate_pytorch/neural_inference/x_obs_test.npz')
-    x_ob = x_ob['x_025'] + x_ob['x_07']
+
+    if mode == 'sim':
+        x_ob = np.load('tumor_surrogate_pytorch/neural_inference/x_obs_test.npz')
+        x_ob = x_ob['x_025'] + x_ob['x_07']
+    else:
+        x_ob = np.load('tumor_surrogate_pytorch/neural_inference/rec001_pre/x_obs_real.npy')
     x_ob_img = np.copy(x_ob)
     x_ob = x_ob.flatten()
     x_ob = torch.tensor(x_ob, device=device)
-    posterior = npe.forward(x_ob=x_ob, num_rounds=args.rounds, num_simulations=args.num_simulations, start_round=args.start_round)
+    print("loaded observation")
+    #posterior = npe.forward(x_ob=x_ob, num_rounds=args.rounds, num_simulations=args.num_simulations, start_round=args.start_round)
 
-
-    '''    
-    with open('tumor_surrogate_pytorch/neural_inference/output/run11_mdn_1component/posterior/round_18.pkl', "rb") as handle:
+    with open('tumor_surrogate_pytorch/neural_inference/output/real_sample5/posterior/round_2.pkl', "rb") as handle:
         posterior = pickle.load(handle)
         proposal = posterior.set_default_x(x_ob)
         simulator = Simulator()
-        gt = get_gt_img(sample_name='10_13_16')
+        #gt = get_gt_img(sample_name='10_13_16')
+
 
         #map_estimate = proposal.map(num_init_samples=50, num_to_optimize=25, show_progress_bars=True)
         #tumor_density = simulator.predict_tumor_density(map_estimate, brain_id='10_13_16')
@@ -259,23 +313,35 @@ if __name__ == '__main__':
         thresholded_u2[thresholded_u2 >= avg_theta[7].cpu().numpy()] = 1
         thresholded_u2[thresholded_u2 < avg_theta[7].cpu().numpy()] = 0
 
-        fig, axs = plt.subplots(2, 3, sharey=True, tight_layout=True)
-        axs[0,0].imshow(gt[0, :, :, 32])
-        axs[0,1].imshow(img)
-        axs[0,2].imshow(np.abs(gt[0, :, :, 32]-img), cmap='jet', vmin=0, vmax=1)
+        # fig, axs = plt.subplots(2, 3, sharey=True, tight_layout=True)
+        # axs[0,0].imshow(gt[0, :, :, 32])
+        # axs[0,1].imshow(img)
+        # axs[0,2].imshow(np.abs(gt[0, :, :, 32]-img), cmap='jet', vmin=0, vmax=1)
 
-        thresholded_u1_gt = np.copy(gt[0, :, :, 32])
-        thresholded_u2_gt = np.copy(gt[0, :, :, 32])
-        thresholded_u1_gt[thresholded_u1_gt >= 0.7] = 1
-        thresholded_u1_gt[thresholded_u1_gt < 0.7] = 0
+        # thresholded_u1_gt = np.copy(gt[0, :, :, 32])
+        # thresholded_u2_gt = np.copy(gt[0, :, :, 32])
+        # thresholded_u1_gt[thresholded_u1_gt >= 0.7] = 1
+        # thresholded_u1_gt[thresholded_u1_gt < 0.7] = 0
+        #
+        # thresholded_u2_gt[thresholded_u2_gt >= 0.25] = 1
+        # thresholded_u2_gt[thresholded_u2_gt < 0.25] = 0
 
-        thresholded_u2_gt[thresholded_u2_gt >= 0.25] = 1
-        thresholded_u2_gt[thresholded_u2_gt < 0.25] = 0
+        # axs[1,0].imshow(thresholded_u1_gt+thresholded_u2_gt)
+        # axs[1,1].imshow(thresholded_u1+thresholded_u2)
+        # axs[1,2].imshow(np.abs((thresholded_u1_gt+thresholded_u2_gt)-(thresholded_u1+thresholded_u2)), cmap='jet', vmin=0, vmax=1)
 
-        axs[1,0].imshow(thresholded_u1_gt+thresholded_u2_gt)
-        axs[1,1].imshow(thresholded_u1+thresholded_u2)
-        axs[1,2].imshow(np.abs((thresholded_u1_gt+thresholded_u2_gt)-(thresholded_u1+thresholded_u2)), cmap='jet', vmin=0, vmax=1)
+        #real sample
+        t1m, t2m, obs, gm, wm, csf = load_images_real()
 
-        plt.savefig('bayesian_inference_pre_5000_run11_mdn_1component_round18.png')
-        '''
-    
+        fig, axs = plt.subplots(1, 3, tight_layout=True)
+        axs[0].imshow(t1m)
+        axs[1].imshow(t2m)
+        axs[2].imshow(obs)
+        plt.savefig('real_sample_input.png')
+
+        fig2, axs2 = plt.subplots(1, 2, tight_layout=True)
+        axs[0].imshow(img)
+        axs[1].imshow(thresholded_u1+thresholded_u2)
+        plt.savefig('real_sample_pred.png')
+
+

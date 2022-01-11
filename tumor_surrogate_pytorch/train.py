@@ -1,6 +1,7 @@
 import math
 
 import torch
+from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 
 from tumor_surrogate_pytorch.config import get_config
@@ -160,7 +161,7 @@ class Trainer():
                         ground_truths.append(ground_truth)
                     # measure mae, dice score and record loss
                     mae_wm_value, mae_gm_value, mae_csf_value = mean_absolute_error(ground_truth=ground_truth, output=output, input=input)
-                    if mae_wm_value is None:
+                    if math.isnan(mae_wm_value) is None or math.isnan(mae_gm_value) or math.isnan(mae_csf_value):
                         print("MAE was None, skipping this sample in validation")
                         continue
 

@@ -33,8 +33,11 @@ class Simulator():
 
         self.net = TumorSurrogate(widths=[128, 128, 128, 128], n_cells=[5, 5, 5, 4], strides=[2, 2, 2, 1])
 
-        if os.path.exists(f'./tumor_surrogate_pytorch/saved_model/whole_dataset_orig_loss_best'):
-            self.net = load_weights(self.net, path=f'./tumor_surrogate_pytorch/saved_model/whole_dataset_orig_loss_best')
+        if os.path.exists(f'./tumor_surrogate_pytorch/saved_model/retrain_model3_best.pt'):
+            print("MODEL LOADED")
+            self.net = load_weights(self.net, path=f'./tumor_surrogate_pytorch/saved_model/retrain_model3_best.pt')
+        else:
+            print("MODEL NOT LOADED AS PATH NOT FOUND!!!")
 
         self.net = self.net.to(device=self.device)
         self.net.eval()
@@ -130,7 +133,7 @@ class Simulator():
 
 class BrainAnatomyDataset:
     def __init__(self, device):
-        data_path = '/home/ivan_nas/npe_data/train/'
+        data_path = '/home/marcel/data/brains/'
         self.samples = sorted(glob.glob(data_path + '*'))
         self.brains = [torch.from_numpy(np.load(sample)).permute((3, 0, 1, 2)) for sample in self.samples]
         self.device = device
@@ -148,9 +151,15 @@ class BrainAnatomyDataset:
         batch_size = center_x.shape[0]
         if brain_id:
             data = torch.empty((batch_size, 3, 64, 64, 64), device=self.device)
-            data_path = f'/home/marc_chan/data/data/valid/{brain_id}.npz'
-            brain = np.load(data_path)
-            brain = torch.from_numpy(brain['x'][:, :, :, 1:]).permute((3, 0, 1, 2))
+            if brain_id == 'real':
+                data_path = f'/home/home/ivan/tumor_surrogate2/tumor_surrogate_pytorch/neural_inference/rec001_pre/rec0001_brain_resized.npy'
+                brain = np.load(data_path)
+                brain = torch.from_numpy(brain).permute((3, 0, 1, 2))
+
+            else:
+                data_path = f'/mnt/Drive3/ivan/data/valid/{brain_id}.npz'
+                brain = np.load(data_path)
+                brain = torch.from_numpy(brain['x'][:, :, :, 1:]).permute((3, 0, 1, 2))
             for i in range(batch_size):
                 data[i] = self.crop(brain, center_x[i], center_y[i], center_z[i])
             return data
@@ -166,7 +175,7 @@ class BrainAnatomyDataset:
 
 
 if __name__ == '__main__':
-    ds = BrainAnatomyDataset()
+    ds = BrainAnatomyDataset(device='cpu')
     item = ds.getitem(0.5, 0.5, 0.5)
 
     sim = Simulator()
